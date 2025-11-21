@@ -1,26 +1,56 @@
-# Dissonance UI
+# Dissonance UI (Electron Desktop App)
 
-This repository will contain the graphical user interface (GUI) for the Dissonance project.
-
----
-
-## Planned Work
-
-- Set up a JUCE-based cross-platform desktop application for audio protection workflows
-- Integrate with the dissonance-core C++ engine for adversarial audio perturbation
-- Design and implement a user-friendly interface for loading, processing, and exporting audio files
-- Provide real-time audio preview and adjustable protection levels
-- Ensure seamless build and run experience on macOS, Windows, and Linux
-- Document build, usage, and contribution guidelines
+This repository contains the downloadable desktop app for the Dissonance project, built with Electron and web technologies.
 
 ---
 
-## Status
+## About
 
-This is the initial commit. Source code and project structure will be added in upcoming branches and pull requests.
+Dissonance UI is a cross-platform desktop app that helps defend audio content from unauthorized AI exploitation by applying imperceptible adversarial perturbations. It integrates with the Dissonance Core repo for its core audio protection logic.
 
 ---
 
-## About Dissonance
+## Tech Stack
+- **Frontend:** HTML, CSS, JavaScript (React planned)
+- **Desktop Packaging:** Electron
+- **Build Tools:** electron-builder
 
-Dissonance is a research-driven project to protect audio content from unauthorized AI exploitation by applying imperceptible adversarial perturbations. The UI will make these tools accessible to musicians, podcasters, journalists, and privacy advocates.
+---
+
+## Two-Repo Architecture
+
+- **Core Repo:** Contains the algorithm and audio processing logic, exposed as a native library or WebAssembly (WASM).
+- **App Repo (this repo):** Electron/web app that pulls the core artifact for its functionality.
+
+### Integration Workflow
+1. The core repo builds and publishes its artifact (native library or WASM) to GitHub Releases, npm, or a public URL.
+2. The app repo fetches the latest core artifact during build (using a script, npm package, or Git submodule).
+3. The Electron app loads and uses the core functionality via Node.js bindings or WASM.
+
+---
+
+## Getting Started
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Run the app locally:
+   ```bash
+   npm start
+   ```
+
+---
+
+## CI/CD
+- Automated builds and packaging via GitHub Actions.
+- Downloadable installers published to GitHub Releases.
+
+---
+
+## License & Ethics
+- Comply with GDPR, CCPA, and ethical data use standards
+- Share research insights and results
+- Engage transparently with the open-source and audio communities
+
+---
