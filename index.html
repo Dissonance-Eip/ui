@@ -61,7 +61,8 @@
       font-weight: 600;
     }
 
-    #processBtn {
+    #processBtn,
+    #exportBtn {
       appearance: none;
       border: none;
       border-radius: 999px;
@@ -70,15 +71,24 @@
       font-weight: 500;
       cursor: pointer;
       color: #0f172a;
-      background: #facc15; /* amber */
       opacity: 0.6;
     }
 
-    #processBtn.enabled {
+    #processBtn {
+      background: #facc15; /* amber */
+    }
+
+    #exportBtn {
+      background: #6ee7b7; /* emerald */
+    }
+
+    #processBtn.enabled,
+    #exportBtn.enabled {
       opacity: 1;
     }
 
-    #processBtn:disabled {
+    #processBtn:disabled,
+    #exportBtn:disabled {
       cursor: default;
     }
 
@@ -108,7 +118,7 @@
 <body>
   <header>
     <h1>Dissonance UI</h1>
-    <p>Import an audio file, then process it via simulated dissonance-core.</p>
+    <p>Import an audio file, then process and export it via simulated dissonance-core.</p>
   </header>
   <main>
     <div id="controls">
@@ -116,6 +126,7 @@
         Drop an audio file here or <span class="accent">choose file</span>
       </div>
       <button id="processBtn" type="button" disabled>Process</button>
+      <button id="exportBtn" type="button" disabled>Export</button>
     </div>
     <div id="log-container">
       <div id="log"></div>
