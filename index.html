@@ -30,6 +30,33 @@
       gap: 0.75rem;
     }
 
+    #controls {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 0.5rem;
+    }
+
+    #dropZone {
+      border: 2px dashed rgba(248, 250, 252, 0.7);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #e5e7eb;
+      background: rgba(15, 23, 42, 0.4);
+      cursor: pointer;
+    }
+
+    #dropZone.dragover {
+      border-color: #fbbf24;
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    #dropZone span.accent {
+      color: #60a5fa; /* blue-400 */
+      font-weight: 600;
+    }
+
     #log-container {
       flex: 1;
       background: rgba(15, 23, 42, 0.7);
@@ -56,9 +83,14 @@
 <body>
   <header>
     <h1>Dissonance UI</h1>
-    <p>IPC between renderer and main is set up. Logs appear below.</p>
+    <p>Import an audio file to test IPC and logging.</p>
   </header>
   <main>
+    <div id="controls">
+      <div id="dropZone">
+        Drop an audio file here or <span class="accent">choose file</span>
+      </div>
+    </div>
     <div id="log-container">
       <div id="log"></div>
     </div>

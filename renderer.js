@@ -48,6 +48,66 @@ window.addEventListener('DOMContentLoaded', () => {
 
   logger.log('dissonance API available from preload');
 
+  const dropZone = document.getElementById('dropZone');
+  if (dropZone) {
+      dropZone.addEventListener('click', async () => {
+      try {
+        logger.setStatus('Opening file dialog...');
+        const filePath = await window.dissonance.openFile();
+        if (!filePath) {
+          logger.log('No file selected');
+          logger.setStatus('Import canceled');
+          return;
+        }
+        logger.log(`Selected file: ${filePath}`);
+        logger.setStatus('File imported');
+      } catch (err) {
+        logger.error(`Import failed: ${err}`);
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files || dt.files.length === 0) {
+        logger.log('Drop: no files');
+        return;
+      }
+      const file = dt.files[0];
+      const filePath = file.path || null;
+      if (!filePath) {
+        logger.log('Drop: file has no path');
+        return;
+      }
+      logger.log(`Dropped file: ${filePath}`);
+      logger.setStatus('File imported (drag-and-drop)');
+    });
+  }
+
+  // Global dragover/drop to allow dropping anywhere in the window without opening in the browser
+  window.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+  });
+
   // Listen for core status events from main via preload bridge
   window.dissonance.onCoreStatus((data) => {
     const msg = data && data.message ? data.message : JSON.stringify(data);
