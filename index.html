@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dissonance Web App</title>
+  <title>Dissonance UI (IPC demo)</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
   <style>
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to bottom, blue, pink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(to bottom, #1e3a8a, #ec4899);
       color: white;
       text-align: center;
       height: 100vh;
@@ -19,7 +20,8 @@
   </style>
 </head>
 <body>
-  <h1>Welcome to Dissonance</h1>
-  <p>Protecting your audio from AI exploitation—now as a desktop web app.</p>
+  <h1>Dissonance UI</h1>
+  <p>IPC between renderer and main is set up. Open DevTools (Console) to see messages.</p>
+  <script src="renderer.js"></script>
 </body>
 </html>
