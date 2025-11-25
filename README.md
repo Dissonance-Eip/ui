@@ -1,3 +1,27 @@
+# Dissonance UI (Electron shell)
+
+This folder contains the Electron shell for the Dissonance desktop app. For now it is a minimal JavaScript-only Electron project.
+
+## What this initial issue includes
+
+- Electron initialized with a single BrowserWindow
+- JavaScript-only (no TypeScript, no bundler)
+- Single-instance lock to avoid double windows
+
+## Install and run
+
+```bash
+cd ui
+npm install
+npm run dev   # or: npm start
+```
+
+This will launch the Electron window that loads `index.html`.
+
+As we implement more issues, the UI from `.testing/` will gradually be ported into this folder (IPC, preload, audio player, etc.).
+
+---
+
 # Dissonance UI (Electron Desktop App)
 
 This repository contains the downloadable desktop app for the Dissonance project, built with Electron and web technologies.
