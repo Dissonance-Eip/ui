@@ -48,9 +48,32 @@ window.addEventListener('DOMContentLoaded', () => {
 
   logger.log('dissonance API available from preload');
 
+  let currentFilePath = null;
+
+  const processBtn = document.getElementById('processBtn');
   const dropZone = document.getElementById('dropZone');
+
+  function updateProcessButton() {
+    if (!processBtn) return;
+    const enabled = !!currentFilePath;
+    processBtn.disabled = !enabled;
+    if (enabled) {
+      processBtn.classList.add('enabled');
+    } else {
+      processBtn.classList.remove('enabled');
+    }
+  }
+
+  async function handleFileImported(filePath, sourceLabel) {
+    currentFilePath = filePath;
+    logger.log(`${sourceLabel} file: ${filePath}`);
+    logger.setStatus('File imported');
+    updateProcessButton();
+  }
+
   if (dropZone) {
-      dropZone.addEventListener('click', async () => {
+    // Click on the drop zone (including the "choose file" text) opens the file dialog
+    dropZone.addEventListener('click', async () => {
       try {
         logger.setStatus('Opening file dialog...');
         const filePath = await window.dissonance.openFile();
@@ -59,13 +82,13 @@ window.addEventListener('DOMContentLoaded', () => {
           logger.setStatus('Import canceled');
           return;
         }
-        logger.log(`Selected file: ${filePath}`);
-        logger.setStatus('File imported');
+        await handleFileImported(filePath, 'Selected');
       } catch (err) {
         logger.error(`Import failed: ${err}`);
       }
     });
 
+    // Drag & drop behaviour
     ['dragenter', 'dragover'].forEach(evt => {
       dropZone.addEventListener(evt, (e) => {
         e.preventDefault();
@@ -82,7 +105,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    dropZone.addEventListener('drop', (e) => {
+    dropZone.addEventListener('drop', async (e) => {
       const dt = e.dataTransfer;
       if (!dt || !dt.files || dt.files.length === 0) {
         logger.log('Drop: no files');
@@ -94,8 +117,31 @@ window.addEventListener('DOMContentLoaded', () => {
         logger.log('Drop: file has no path');
         return;
       }
-      logger.log(`Dropped file: ${filePath}`);
-      logger.setStatus('File imported (drag-and-drop)');
+      await handleFileImported(filePath, 'Dropped');
+    });
+  }
+
+  if (processBtn) {
+    processBtn.addEventListener('click', async () => {
+      if (!currentFilePath) {
+        logger.setStatus('No file to process', true);
+        return;
+      }
+      try {
+        logger.setStatus('Processing...');
+        logger.log('Sending processing request to dissonance-core (simulated)');
+        const resp = await window.dissonance.processFile(currentFilePath);
+        if (resp && resp.ok && resp.processedPath) {
+          logger.setStatus('Processed');
+          logger.log(`Processing complete: ${resp.processedPath}`);
+        } else {
+          const errMsg = resp && resp.error ? resp.error : 'Unknown error';
+          logger.setStatus(`Processing failed: ${errMsg}`, true);
+          logger.log(`Processing failed: ${errMsg}`);
+        }
+      } catch (err) {
+        logger.error(`Processing failed: ${err}`);
+      }
     });
   }
 
@@ -114,6 +160,7 @@ window.addEventListener('DOMContentLoaded', () => {
     logger.log(`core:status — ${msg}`);
   });
 
+  updateProcessButton();
   logger.setStatus('Ready');
 
   // Expose for debugging in DevTools

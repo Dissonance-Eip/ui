@@ -33,18 +33,22 @@
     #controls {
       display: flex;
       justify-content: center;
+      gap: 0.75rem;
       margin-bottom: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
     #dropZone {
       border: 2px dashed rgba(248, 250, 252, 0.7);
       border-radius: 0.75rem;
-      padding: 1.25rem;
+      padding: 1.0rem 1.5rem;
       text-align: center;
       font-size: 0.9rem;
       color: #e5e7eb;
       background: rgba(15, 23, 42, 0.4);
       cursor: pointer;
+      min-width: 260px;
     }
 
     #dropZone.dragover {
@@ -55,6 +59,27 @@
     #dropZone span.accent {
       color: #60a5fa; /* blue-400 */
       font-weight: 600;
+    }
+
+    #processBtn {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 0.45rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      color: #0f172a;
+      background: #facc15; /* amber */
+      opacity: 0.6;
+    }
+
+    #processBtn.enabled {
+      opacity: 1;
+    }
+
+    #processBtn:disabled {
+      cursor: default;
     }
 
     #log-container {
@@ -83,13 +108,14 @@
 <body>
   <header>
     <h1>Dissonance UI</h1>
-    <p>Import an audio file to test IPC and logging.</p>
+    <p>Import an audio file, then process it via simulated dissonance-core.</p>
   </header>
   <main>
     <div id="controls">
       <div id="dropZone">
         Drop an audio file here or <span class="accent">choose file</span>
       </div>
+      <button id="processBtn" type="button" disabled>Process</button>
     </div>
     <div id="log-container">
       <div id="log"></div>
