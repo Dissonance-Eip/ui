@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { TagWriteQueue } from '../renderer/services/TagWriteQueue.js';
+import { TagWriteQueue } from '../../../renderer/services/TagWriteQueue.js';
 
 /**
  * Helper: build a writeFn that resolves after `ms` ms, recording every call.
@@ -236,5 +236,19 @@ describe('TagWriteQueue — error handling', () => {
 
     q.enqueue('/a.wav', { title: 'A' });
     await expect(q.flush()).resolves.toBeUndefined();
+  });
+
+  it('flush still settles when onError itself throws', async () => {
+    const fn = vi.fn(() => Promise.reject(new Error('disk full')));
+    const onError = vi.fn(() => {
+      throw new Error('error reporter crashed');
+    });
+    const q = new TagWriteQueue({ writeFn: fn, onError });
+
+    q.enqueue('/a.wav', { title: 'A' });
+    await expect(q.flush()).resolves.toBeUndefined();
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(q.isWriting).toBe(false);
   });
 });

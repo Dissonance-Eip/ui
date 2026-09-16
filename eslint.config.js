@@ -48,6 +48,16 @@ module.exports = [
     },
   },
   {
+    // Renderer tests run in a simulated browser (happy-dom), so window and
+    // document exist there on top of the Node globals below.
+    files: ['tests/renderer/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
+  {
     // Test files use ESM (to import renderer source) and run under Node.
     files: ['tests/**/*.js'],
     languageOptions: {

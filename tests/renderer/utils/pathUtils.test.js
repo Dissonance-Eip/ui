@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { basename } from '../renderer/utils/pathUtils.js';
+import { basename } from '../../../renderer/utils/pathUtils.js';
 
 describe('basename', () => {
   it('extracts the last segment of a POSIX path', () => {

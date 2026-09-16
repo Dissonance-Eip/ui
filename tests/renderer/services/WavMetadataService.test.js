@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { WavMetadataService } from '../renderer/services/WavMetadataService.js';
+import { WavMetadataService } from '../../../renderer/services/WavMetadataService.js';
 
 describe('WavMetadataService', () => {
   let svc;

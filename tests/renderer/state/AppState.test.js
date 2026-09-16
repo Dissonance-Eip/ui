@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AppState } from '../renderer/state/AppState.js';
+import { AppState } from '../../../renderer/state/AppState.js';
 
 describe('AppState', () => {
   let state;

@@ -3,7 +3,7 @@ import {
   formatDuration,
   formatSampleRate,
   formatChannels,
-} from '../renderer/utils/wavInfoFormatters.js';
+} from '../../../renderer/utils/wavInfoFormatters.js';
 
 describe('formatDuration', () => {
   it('returns m:ss with zero-padded seconds for normal durations', () => {
