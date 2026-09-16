@@ -23,7 +23,8 @@
     "predist": "npm run build:css",
     "dist": "electron-builder --publish never",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "",
   "license": "MIT",
@@ -60,6 +61,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "electron": "^40.6.0",
     "electron-builder": "^26.8.1",
     "eslint": "^10.0.1",

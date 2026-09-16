@@ -58,6 +58,10 @@ All four are gated by CI on every push/PR.
 
 For an interactive test loop: `npm run test:watch`.
 
+For test coverage: `npm run test:coverage`. It prints a per-file table and
+writes an HTML report to `coverage/index.html`. Every source file counts,
+including ones no test imports, so untested code shows up as 0%.
+
 ---
 
 ## What's in the renderer
