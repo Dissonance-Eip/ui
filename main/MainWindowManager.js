@@ -7,6 +7,9 @@
 const { BrowserWindow } = require('electron');
 const fs = require('fs');
 
+const MIN_WINDOW_WIDTH = 560;
+const MIN_WINDOW_HEIGHT = 680;
+
 class MainWindowManager {
   constructor({ preloadPath, iconPath }) {
     this.preloadPath = preloadPath;
@@ -26,6 +29,8 @@ class MainWindowManager {
       width,
       height,
       ...(hasIcon ? { icon: this.iconPath } : {}),
+      minWidth: MIN_WINDOW_WIDTH,
+      minHeight: MIN_WINDOW_HEIGHT,
       webPreferences: {
         preload: this.preloadPath,
         contextIsolation: true,
