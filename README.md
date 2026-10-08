@@ -1,8 +1,41 @@
-# Dissonance UI
+# Dissonance
 
-Electron desktop app that protects audio content from unauthorized AI exploitation by applying imperceptible adversarial perturbations. Pairs with the [`core`](https://github.com/Dissonance-Eip/core) repo, which provides the C++ audio pipeline as a Node.js native addon.
+Dissonance is a desktop app for musicians and rights holders who want to protect their music from being used by AI models. It adds a carefully shaped perturbation to a WAV file, designed to stay below what a listener can hear while getting in the way of AI analysis.
 
-All audio processing is local. No network calls.
+Everything runs on your computer: your files are never uploaded. The audio engine lives in the [`core`](https://github.com/Dissonance-Eip/core) repository.
+
+Dissonance is a student project (Epitech EIP) in active development, and the strength of the protection is still being improved.
+
+---
+
+## Install
+
+Download the latest version from the [releases page](https://github.com/Dissonance-Eip/ui/releases/latest):
+
+| System                | File                             |
+| --------------------- | -------------------------------- |
+| macOS (Apple Silicon) | `Dissonance-<version>-arm64.dmg` |
+| Windows (x64)         | `Dissonance.Setup.<version>.exe` |
+| Linux (x64)           | `Dissonance-<version>.AppImage`  |
+
+The builds are not signed yet, so your system warns you the first time you open the app:
+
+- **macOS:** right-click the app, then **Open**
+- **Windows:** click **More info**, then **Run anyway**
+
+There is no build for Intel Macs yet.
+
+## Using Dissonance
+
+1. **Upload:** drop a WAV file on the window, or pick one from disk.
+2. **Analyze:** check the file's details, edit its tags, choose the protection strength, then **Process**.
+3. **Compare:** listen to the original and the protected version side by side, then **Export** the protected file.
+
+Only WAV files are supported.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The rest of this README is for developers.
 
 ---
 
@@ -17,14 +50,14 @@ All audio processing is local. No network calls.
 
 ---
 
-## Setup
+## Build from source
 
 ### Prerequisites
 
 - Node.js 20.x (matches CI)
 - npm
 
-### Install
+### Install dependencies
 
 ```bash
 cd ui
@@ -139,7 +172,9 @@ The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts fro
 
 `npm run build` runs `electron-builder --dir` — produces an unpacked `.app` (or `.exe` folder, or `.AppImage` folder) for local testing.
 
-Producing distributable installers (`.dmg`, `.exe`, `.AppImage`) is on the beta task list — needs the `electron-builder` config block in `package.json` filled in plus a cross-platform CI workflow.
+`npm run dist` builds the installers for your platform (`.dmg` and `.zip` on macOS, an NSIS `.exe` on Windows, an `.AppImage` on Linux) into `dist/`.
+
+Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag builds all three platforms and publishes them as a GitHub release.
 
 ---
 
