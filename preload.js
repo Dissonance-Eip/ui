@@ -14,7 +14,7 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 console.log('Preload script loaded (ui/preload.js)');
 
 contextBridge.exposeInMainWorld('dissonance', {
-  openFile: () => ipcRenderer.invoke('dialog:openFile'),
+  openFile: (lastFilePath) => ipcRenderer.invoke('dialog:openFile', lastFilePath),
   getSystemTheme: () => ipcRenderer.invoke('ui:getSystemTheme'),
   getPathForFile: (file) => {
     try {

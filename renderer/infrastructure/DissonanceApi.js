@@ -7,8 +7,8 @@ import { BaseApi } from '../base/BaseApi.js';
  * channel handled by the main process.
  */
 export class DissonanceApi extends BaseApi {
-  async openFile() {
-    return this._call('openFile');
+  async openFile(lastFilePath) {
+    return this._call('openFile', lastFilePath);
   }
 
   async getSystemTheme() {

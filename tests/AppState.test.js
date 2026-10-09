@@ -47,4 +47,15 @@ describe('AppState', () => {
     expect(state.processedFilePath).toBeNull();
     expect(state.currentFilePath).toBe('/a.wav'); // untouched
   });
+
+  it('remembers the last imported file across a reset to null', () => {
+    expect(state.lastImportedFilePath).toBeNull();
+    state.setCurrentFilePath('/music/a.wav');
+    state.setCurrentFilePath(null);
+    expect(state.currentFilePath).toBeNull();
+    expect(state.lastImportedFilePath).toBe('/music/a.wav');
+
+    state.setCurrentFilePath('/other/b.wav');
+    expect(state.lastImportedFilePath).toBe('/other/b.wav');
+  });
 });
