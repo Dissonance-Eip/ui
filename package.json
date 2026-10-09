@@ -6,8 +6,8 @@
   "description": "Silencing AI, Preserving Sound",
   "main": "main.js",
   "scripts": {
-    "build:css": "tailwindcss -c ./tailwind.config.js -i ./tailwind.input.css -o ./tailwind.css",
-    "watch:css": "tailwindcss -c ./tailwind.config.js -i ./tailwind.input.css -o ./tailwind.css --watch",
+    "build:css": "tailwindcss -i ./tailwind.input.css -o ./tailwind.css",
+    "watch:css": "tailwindcss -i ./tailwind.input.css -o ./tailwind.css --watch",
     "prestart": "npm run build:css",
     "predev": "npm run build:css",
     "prebuild": "npm run build:css",
@@ -15,6 +15,10 @@
     "dev": "electron .",
     "dev:with-core": "npm run build:core && npm run build:css && DISSONANCE_CORE_ADDON_PATH=../core/build/Release/dissonance_core.node electron .",
     "build:core": "cd ../core && npm run build",
+    "check:peers": "check-peer-dependencies --npm --findSolutions --ignore keyv",
+    "check:deps": "depcheck --ignores=@arraypress/waveform-player,tailwindcss --skip-missing",
+    "check:updates": "ncu",
+    "check:audit": "npm audit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
@@ -59,13 +63,17 @@
     "bindings": "^1.5.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.0",
-    "electron": "^40.6.0",
-    "electron-builder": "^26.8.1",
-    "eslint": "^10.0.1",
-    "globals": "^17.3.0",
-    "prettier": "^3.6.2",
-    "tailwindcss": "^3.4.17",
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/cli": "^4.3.3",
+    "check-peer-dependencies": "^5.0.0",
+    "depcheck": "^1.4.7",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "npm-check-updates": "^23.1.0",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4.3.3",
     "vitest": "^4.1.7"
   }
 }

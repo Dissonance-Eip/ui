@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* Smooth-scroll easing for anchor jumps and scrollTo() calls. */
 @layer base {
@@ -10,7 +10,7 @@
 }
 
 /* Indeterminate progress bar (no real percentage available from the core
-   addon yet) — a segment slides back and forth across the track. */
+   addon yet) - a segment slides back and forth across the track. */
 @keyframes indeterminate-bar {
   0% {
     transform: translateX(-100%);
