@@ -53,6 +53,7 @@ export function bootstrap() {
     dropZoneEl: document.getElementById('dropZone'),
     api,
     logger,
+    getLastFilePath: () => state.lastImportedFilePath,
   });
 
   const analyzeView = new AnalyzeView({

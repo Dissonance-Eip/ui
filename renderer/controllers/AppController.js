@@ -93,7 +93,7 @@ export class AppController extends BaseController {
     this.analyzeView.onChangeFile(async () => {
       try {
         this.logger?.setStatus?.('Opening file dialog...');
-        const filePath = await this.api.openFile();
+        const filePath = await this.api.openFile(this.state.lastImportedFilePath);
         if (!filePath) {
           this.logger?.log?.('No file selected');
           this.logger?.setStatus?.('Import canceled');

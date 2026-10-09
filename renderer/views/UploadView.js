@@ -7,9 +7,9 @@ import { DropZone } from '../components/DropZone.js';
 import { BaseComponent } from '../base/BaseComponent.js';
 
 export class UploadView extends BaseComponent {
-  constructor({ dropZoneEl, api, logger }) {
+  constructor({ dropZoneEl, api, logger, getLastFilePath }) {
     super();
-    this.dropZone = new DropZone({ el: dropZoneEl, api, logger });
+    this.dropZone = new DropZone({ el: dropZoneEl, api, logger, getLastFilePath });
   }
 
   onFileImported(cb) {

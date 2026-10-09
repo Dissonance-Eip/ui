@@ -9,11 +9,12 @@ import { BaseComponent } from '../base/BaseComponent.js';
 const DRAGOVER_CLASSES = ['border-amber-400', 'bg-amber-50', 'dark:bg-amber-950/30'];
 
 export class DropZone extends BaseComponent {
-  constructor({ el, api, logger }) {
+  constructor({ el, api, logger, getLastFilePath }) {
     super();
     this.el = el;
     this.api = api;
     this.logger = logger;
+    this.getLastFilePath = getLastFilePath;
     this.onFileSelected = null;
 
     this._onClick = this._onClick.bind(this);
@@ -46,7 +47,7 @@ export class DropZone extends BaseComponent {
   async _onClick() {
     try {
       this.logger?.setStatus('Opening file dialog...');
-      const filePath = await this.api.openFile();
+      const filePath = await this.api.openFile(this.getLastFilePath?.());
       if (!filePath) {
         this.logger?.log('No file selected');
         this.logger?.setStatus('Import canceled');
