@@ -29,7 +29,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `AppController.js` — top-level orchestration: the three-view flow, the TagWriteQueue, the playback↔queue coordination, the quit-flush handler.
 - `renderer/views/`
   - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
-  - `AnalyzeView.js` — file info + waveform + editable metadata + protection slider + process button.
+  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button.
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
 - `renderer/components/`
   - `DropZone.js` — drag/drop + click-to-open file picker. Falls back to the native dialog when a dropped file has no resolvable path.
