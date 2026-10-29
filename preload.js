@@ -13,6 +13,31 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 console.log('Preload script loaded (ui/preload.js)');
 
+/**
+ * Subscribe `cb` to a main → renderer request. Once `cb` settles, answer on
+ * `doneChannel` with the request's id so main knows THIS window is done
+ * (see ipcHandlers/rendererMessaging.js). Returns an unsubscribe function.
+ */
+function answerRequests(requestChannel, doneChannel, cb) {
+  const handler = async (_event, request) => {
+    try {
+      await cb(request);
+    } catch (e) {
+      console.error(`${requestChannel} handler failed`, e);
+    } finally {
+      ipcRenderer.send(doneChannel, { requestId: request && request.requestId });
+    }
+  };
+  ipcRenderer.on(requestChannel, handler);
+  return () => ipcRenderer.removeListener(requestChannel, handler);
+}
+
+function subscribe(channel, cb) {
+  const handler = (_event, data) => cb(data);
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
+}
+
 contextBridge.exposeInMainWorld('dissonance', {
   openFile: (lastFilePath) => ipcRenderer.invoke('dialog:openFile', lastFilePath),
   getSystemTheme: () => ipcRenderer.invoke('ui:getSystemTheme'),
@@ -29,18 +54,14 @@ contextBridge.exposeInMainWorld('dissonance', {
   exportFile: (processedPath) => ipcRenderer.invoke('core:export', processedPath),
   cleanupProcessedFile: (processedPath) =>
     ipcRenderer.invoke('core:cleanupProcessed', processedPath),
-  onAppFlushRequest: (cb) => {
-    const handler = () => cb();
-    ipcRenderer.on('app:flushRequest', handler);
-    return () => ipcRenderer.removeListener('app:flushRequest', handler);
-  },
-  notifyFlushDone: () => ipcRenderer.send('app:flushDone'),
+  onAppFlushRequest: (cb) => answerRequests('app:flushRequest', 'app:flushDone', () => cb()),
+  onPauseFileRequest: (cb) =>
+    answerRequests('player:pauseFileRequest', 'player:pauseFileDone', (request) =>
+      cb({ filePath: request && request.filePath })
+    ),
+  onTagsWrittenElsewhere: (cb) => subscribe('tags:writtenElsewhere', cb),
   logToMain: (level, message) => ipcRenderer.send('ui:log', { level, message }),
-  onCoreStatus: (cb) => {
-    const handler = (_event, data) => cb(data);
-    ipcRenderer.on('core:status', handler);
-    return () => ipcRenderer.removeListener('core:status', handler);
-  },
+  onCoreStatus: (cb) => subscribe('core:status', cb),
   onSystemTheme: (cb) => {
     const handler = (_event, data) => cb(data);
     ipcRenderer.on('ui:systemTheme', handler);

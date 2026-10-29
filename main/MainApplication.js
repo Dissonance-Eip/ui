@@ -2,11 +2,13 @@
  * Top-level Electron lifecycle controller.
  *
  * Owns:
- *   - The single MainWindowManager
- *   - The quit/close flush dance: before the window is destroyed (X button)
- *     or the app exits (Cmd+Q), the renderer is asked to drain its tag-write
- *     queue. Both paths funnel through _flushThroughRenderer() with a 3s
- *     safety timeout so an unresponsive renderer can never hang quit.
+ *   - The MainWindowManager and the single-instance routing: launching the
+ *     app again opens another window in THIS process (main/singleInstance.js)
+ *     so every window shares one main process and its coordination.
+ *   - The quit/close flush dance: before a window is destroyed (X button)
+ *     or the app exits (Cmd+Q), each renderer is asked to drain its
+ *     tag-write queue (main/windowFlush.js), with a 3s safety timeout per
+ *     window so an unresponsive renderer can never hang quit.
  *   - Final temp-file cleanup on `will-quit` (exactly once per session).
  */
 const { app, BrowserWindow, ipcMain } = require('electron');
@@ -14,10 +16,10 @@ const path = require('path');
 const fs = require('fs');
 
 const { MainWindowManager } = require('./MainWindowManager');
-const { registerFileHandlers } = require('../ipcHandlers/fileHandlers');
+const { routeLaunchesToFirstInstance } = require('./singleInstance');
+const { flushWindow, flushWindows, attachCloseFlush } = require('./windowFlush');
+const { registerFileHandlers, registerWindowHandlers } = require('../ipcHandlers/fileHandlers');
 const { cleanupAllTempFiles } = require('../ipcHandlers/core/coreSetup');
-
-const FLUSH_TIMEOUT_MS = 3000;
 
 class MainApplication {
   constructor({ uiRoot = path.join(__dirname, '..') } = {}) {
@@ -28,10 +30,8 @@ class MainApplication {
       iconPath: this.iconPath,
     });
 
-    // Lifecycle flags
-    this._readyToQuit = false; // before-quit may proceed without re-flush
-    this._closeFlushPending = false; // a close-event flush is in progress
-    this._closeFlushed = false; // close-event flush already completed
+    // Lifecycle flag: before-quit already flushed every window.
+    this._readyToQuit = false;
   }
 
   run() {
@@ -40,7 +40,14 @@ class MainApplication {
     // whenReady() for the Dock/menu bar to pick it up.
     app.setName('Dissonance');
 
+    const isPrimary = routeLaunchesToFirstInstance({
+      app,
+      openWindow: () => app.whenReady().then(() => this._createAndInitWindow()),
+    });
+    if (!isPrimary) return;
+
     app.whenReady().then(() => {
+      registerFileHandlers();
       this._createAndInitWindow();
       this._applyDockIcon();
 
@@ -60,25 +67,17 @@ class MainApplication {
     app.on('before-quit', (event) => {
       if (this._readyToQuit) return;
 
-      const win = this.windowManager.getWindow();
-      if (!win || win.isDestroyed()) {
-        // No window to flush through (likely closed via X already, in which
-        // case the close-handler did the flush). Just exit.
-        this._readyToQuit = true;
-        app.quit();
-        return;
-      }
-
-      // If the close-event flush has already run for this window, skip the
-      // round-trip and quit immediately.
-      if (this._closeFlushed) {
+      const openWindows = this.windowManager.getWindows().filter((win) => !win.isDestroyed());
+      if (openWindows.length === 0) {
+        // No window to flush through (all closed via X already, in which
+        // case each close-handler did its flush). Just exit.
         this._readyToQuit = true;
         app.quit();
         return;
       }
 
       event.preventDefault();
-      this._flushThroughRenderer(win, () => {
+      flushWindows(ipcMain, openWindows).then(() => {
         this._readyToQuit = true;
         app.quit();
       });
@@ -105,55 +104,23 @@ class MainApplication {
   }
 
   _createAndInitWindow() {
-    const hadWindow = !!this.windowManager.getWindow();
     const win = this.windowManager.createWindow({});
 
-    if (!hadWindow) {
-      // Intercept the window's close event so we can flush any pending tag
-      // writes BEFORE the window is destroyed (otherwise before-quit fires
-      // with no live webContents to talk to and edits are lost on Win/Linux,
-      // where clicking the X is the most common quit path).
-      win.on('close', (event) => {
-        if (this._closeFlushed || this._closeFlushPending) return;
-        event.preventDefault();
-        this._closeFlushPending = true;
-        this._flushThroughRenderer(win, () => {
-          this._closeFlushed = true;
-          this._closeFlushPending = false;
-          win.close();
-        });
-      });
+    // Flush this window's pending tag writes BEFORE it is destroyed
+    // (otherwise edits are lost on Win/Linux, where clicking the X is the
+    // most common quit path). Each window tracks its own flush.
+    attachCloseFlush({
+      win,
+      flush: (target) => flushWindow(ipcMain, target),
+      isQuitting: () => this._readyToQuit,
+    });
 
-      win.loadFile(path.join(this.uiRoot, 'index.html')).catch((e) => {
-        console.error('Failed to load index.html:', e);
-      });
-      registerFileHandlers(win);
-    }
+    win.loadFile(path.join(this.uiRoot, 'index.html')).catch((e) => {
+      console.error('Failed to load index.html:', e);
+    });
+    registerWindowHandlers(win);
 
     return win;
-  }
-
-  /**
-   * Ask the renderer to drain its tag-write queue, then call onDone.
-   * A safety timeout guarantees we never hang if the renderer is unresponsive.
-   */
-  _flushThroughRenderer(win, onDone) {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      onDone();
-    };
-    const timeout = setTimeout(finish, FLUSH_TIMEOUT_MS);
-    ipcMain.once('app:flushDone', () => {
-      clearTimeout(timeout);
-      finish();
-    });
-    try {
-      win.webContents.send('app:flushRequest');
-    } catch (_e) {
-      // webContents may be gone — fall back to the timeout.
-    }
   }
 
   _cleanup() {
