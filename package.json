@@ -27,10 +27,11 @@
     "predist": "npm run build:css",
     "dist": "electron-builder --publish never",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "build": {
     "appId": "com.dissonanceeip.dissonance",
     "productName": "Dissonance",
@@ -65,6 +66,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/cli": "^4.3.3",
+    "@vitest/coverage-v8": "^4.1.12",
     "check-peer-dependencies": "^5.0.0",
     "depcheck": "^1.4.7",
     "electron": "^44.7.0",
