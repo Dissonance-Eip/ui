@@ -70,13 +70,13 @@ jobs:
       - name: Run unit and addon integration tests
         run: npm test
 
-      - name: Report test coverage
+      - name: Check test coverage (fails below 85% lines)
         run: |
           npm run test:coverage
           LINES=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct)")
           echo "### Test coverage" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Total line coverage: **${LINES}%** (team target: 50%, not enforced yet)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Total line coverage: **${LINES}%** (team target: 85%, enforced by vitest.config.mjs)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: SonarQube Cloud scan
         if: ${{ env.SONAR_ENABLED == 'true' }}

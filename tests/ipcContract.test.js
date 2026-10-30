@@ -54,7 +54,7 @@ function recordPreloadChannels({ argv = [] } = {}) {
     console: { log() {}, error() {} },
     process: { argv: [...argv] },
   };
-  vm.runInNewContext(readFileSync(PRELOAD_PATH, 'utf8'), sandbox);
+  vm.runInNewContext(readFileSync(PRELOAD_PATH, 'utf8'), sandbox, { filename: PRELOAD_PATH });
   const exposed = api;
   Object.values(exposed).forEach((method) => method(() => {}));
   return { channels, listeners, ipcRenderer, api: exposed };
