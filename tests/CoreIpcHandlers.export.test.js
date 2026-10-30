@@ -4,23 +4,12 @@ import path from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CoreIpcHandlers } from '../ipcHandlers/core/CoreIpcHandlers.js';
 import { TempFileManager } from '../ipcHandlers/core/TempFileManager.js';
-import { makeIpc, makeWebContents } from './helpers/fakeElectron.js';
+import { makeHandlingIpc, makeWebContents } from './helpers/fakeElectron.js';
 
 const EXPORT_CHANNEL = 'core:export';
 const STATUS_CHANNEL = 'core:status';
 const PROCESSED_AUDIO = 'processed audio bytes';
 const SECRET = 'private key material';
-
-/** ipcMain double that also records invoke handlers like ipcMain.handle(). */
-function makeHandlingIpc() {
-  const ipc = makeIpc();
-  ipc.handlers = new Map();
-  ipc.handle = vi.fn((channel, handler) => {
-    if (ipc.handlers.has(channel)) throw new Error(`second handler for ${channel}`);
-    ipc.handlers.set(channel, handler);
-  });
-  return ipc;
-}
 
 let workDir;
 let rootDir;
@@ -241,6 +230,22 @@ describe('core:export destination', () => {
     if (typeof savePath === 'string' && path.isAbsolute(savePath)) {
       expect(await exists(savePath)).toBe(false);
     }
+  });
+
+  it('keeps the processed file for a retry and reports an error when the copy fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const savePath = path.join(outsideDir, 'missing-folder', 'exported.wav');
+    const { tempFileManager, sender, exportFile } = setup({ savePath });
+    const tracked = await makeTrackedTempFile(tempFileManager, sender.id);
+
+    const result = await exportFile(tracked);
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/ENOENT/);
+    expect(await exists(tracked)).toBe(true);
+    expect(tempFileManager.isTracked(tracked)).toBe(true);
+    const statuses = sender.send.mock.calls.filter(([channel]) => channel === STATUS_CHANNEL);
+    expect(statuses.at(-1)[1]).toEqual({ status: 'error', message: 'Export failed' });
   });
 
   it('lets the user export over an existing file they picked, such as the original', async () => {

@@ -2,60 +2,20 @@ import { describe, it, expect, vi } from 'vitest';
 import { AppController } from '../renderer/controllers/AppController.js';
 import { AppState } from '../renderer/state/AppState.js';
 import { WavMetadataService } from '../renderer/services/WavMetadataService.js';
+import {
+  deferred,
+  settle,
+  metadataReply,
+  makeLogger,
+  makeAnalyzeView,
+  makeCompareView,
+} from './helpers/fakeRenderer.js';
 
 const FILE_A = '/music/a.wav';
 const FILE_B = '/music/b.wav';
 const PROCESSED = '/tmp/out.wav';
-const EMPTY_FORM = Object.freeze({ title: '', artist: '' });
 const TAGS_A = Object.freeze({ title: 'Title A', artist: 'Artist A' });
 const TAGS_B = Object.freeze({ title: 'Title B', artist: 'Artist B' });
-
-function deferred() {
-  let resolve;
-  const promise = new Promise((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
-
-const metadataReply = (tags) => ({ ok: true, audio: { sampleRate: 44100 }, tags: { ...tags } });
-
-/** Lets every queued microtask and promise continuation run. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-/**
- * A tag form that behaves like AnalyzeView's: setBasicWavInfo fills it,
- * getMetadataTags reads it back with every field present, type() is the user.
- */
-function makeAnalyzeView() {
-  let form = { ...EMPTY_FORM };
-  return {
-    setBasicWavInfo: vi.fn((info) => {
-      if (info && info.tags) form = { ...EMPTY_FORM, ...info.tags };
-    }),
-    getMetadataTags: vi.fn(() => ({ ...form })),
-    type(field, value) {
-      form = { ...form, [field]: value };
-    },
-    setSelectedFile: vi.fn(),
-    setAudioPreviewFile: vi.fn(),
-    setProcessEnabled: vi.fn(),
-    pauseAudioPreview: vi.fn(),
-    // Process needs at least one mode since the strength slider was removed (#104).
-    getProcessingModes: vi.fn(() => ['white_noise']),
-  };
-}
-
-function makeCompareView() {
-  return {
-    clearAudioPreviews: vi.fn(),
-    pauseAudioPreviews: vi.fn(),
-    setExportEnabled: vi.fn(),
-    setOriginalInfo: vi.fn(),
-    setProcessedInfo: vi.fn(),
-    setAudioPreviewFiles: vi.fn(),
-  };
-}
 
 /** Each readFileMetadata call stays pending until the test settles it. */
 function makeApi() {
@@ -79,7 +39,7 @@ function makeController() {
   const analyzeView = makeAnalyzeView();
   const controller = new AppController({
     api,
-    logger: { log: vi.fn(), setStatus: vi.fn(), error: vi.fn() },
+    logger: makeLogger(),
     router: { show: vi.fn() },
     state: new AppState(),
     uploadView: {},
