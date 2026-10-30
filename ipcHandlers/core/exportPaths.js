@@ -4,8 +4,9 @@
  * an arbitrary file anywhere, so:
  *
  *   checkExportSource()      – the source must be a temp file the app itself
- *                              created and still tracks, and must be a regular
- *                              file (not a symlink swapped in, not a directory)
+ *                              created and still tracks, must lie under the
+ *                              temp root, and must be a regular file (not a
+ *                              symlink swapped in, not a directory)
  *   checkExportDestination() – the destination comes only from the save
  *                              dialog and must be absolute and outside the
  *                              temp root (where a later cleanup would delete it)
@@ -27,6 +28,9 @@ const INVALID_DESTINATION = 'Invalid export destination';
 async function checkExportSource(tempFileManager, processedPath) {
   if (typeof processedPath !== 'string' || !processedPath) return 'No processed file path';
   if (!tempFileManager.isTracked(processedPath)) return INVALID_SOURCE;
+  // Defence in depth: tracked paths are minted under the root, so this only
+  // fails if something registered a path from elsewhere.
+  if (!tempFileManager.isUnderRoot(processedPath)) return INVALID_SOURCE;
 
   try {
     // lstat doesn't follow symlinks, so a tracked path replaced by a link fails here.

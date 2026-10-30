@@ -193,6 +193,19 @@ describe('TempFileManager.cleanupTempFile — root checks', () => {
   });
 });
 
+describe('TempFileManager.safeUnlink', () => {
+  it('refuses a path outside the temp root, even a tracked one, and keeps the file', async () => {
+    const manager = new TempFileManager({ rootDir });
+    const userFile = await writeFile(path.join(userDir, 'song.wav'));
+    manager.registerForSender(WINDOW_A, userFile);
+
+    await expect(manager.safeUnlink(userFile)).rejects.toThrow('not under the temp root');
+    await expect(manager.cleanupTempFile(userFile)).rejects.toThrow('not under the temp root');
+    expect(await exists(userFile)).toBe(true);
+    expect(manager.isTracked(userFile)).toBe(true);
+  });
+});
+
 function unlinkError(code) {
   return Object.assign(new Error(`${code}: cannot unlink`), { code });
 }

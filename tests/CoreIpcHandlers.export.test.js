@@ -109,6 +109,15 @@ describe('core:export source', () => {
     );
   });
 
+  it('rejects a tracked path that lies outside the temp root', async () => {
+    const { dialog, tempFileManager, sender, exportFile, savePath } = setup();
+    tempFileManager.registerForSender(sender.id, secretPath);
+
+    const result = await exportFile(secretPath);
+
+    await expectRejectedWithoutSideEffects({ result, dialog, savePath });
+  });
+
   it('rejects a file the app never created', async () => {
     const { dialog, exportFile, savePath } = setup();
 

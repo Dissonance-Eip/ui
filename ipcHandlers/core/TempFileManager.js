@@ -85,9 +85,16 @@ class TempFileManager {
     }
   }
 
-  /** Deletes filePath; already gone is fine, any other failure is thrown. */
+  /**
+   * Deletes filePath; already gone is fine, any other failure is thrown.
+   * Refuses (throws) anything outside the temp root, whatever the caller
+   * checked: every path this manager mints or tracks lives under it.
+   */
   async safeUnlink(filePath) {
     if (!filePath) return;
+    if (!this.isUnderRoot(filePath)) {
+      throw new Error(`Refusing to delete ${filePath}: not under the temp root`);
+    }
     try {
       await fs.unlink(filePath);
     } catch (e) {
