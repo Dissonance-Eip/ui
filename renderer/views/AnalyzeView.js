@@ -4,7 +4,8 @@
  *   • basic WAV info (filename, duration, sample rate, channels)
  *   • a WaveformPreview (single player)
  *   • the editable metadata form (title, artist, date, genre, comment,
- *     copyright, software) — TAG_FIELDS is the single source of truth
+ *     copyright, software) — TAG_FIELDS is the single source of truth;
+ *     the inputs are found by their `data-tag` attribute
  *   • the Process button
  *
  * Pure presentational concerns only — the queue/write logic lives in
@@ -19,6 +20,17 @@ import { canProcess } from '../utils/processingOptions.js';
 // Single source of truth for editable metadata fields.
 const TAG_FIELDS = ['title', 'artist', 'date', 'genre', 'comment', 'copyright', 'software'];
 
+/**
+ * Editable tag inputs keyed by field name, from their `data-tag` attribute.
+ * Inputs naming a field outside TAG_FIELDS are ignored.
+ */
+function tagInputsByField(inputEls) {
+  const byName = new Map(Array.from(inputEls || []).map((el) => [el.getAttribute('data-tag'), el]));
+  return Object.fromEntries(
+    TAG_FIELDS.filter((name) => byName.has(name)).map((name) => [name, byName.get(name)])
+  );
+}
+
 export class AnalyzeView extends BaseComponent {
   constructor({
     selectedFileEl,
@@ -27,13 +39,7 @@ export class AnalyzeView extends BaseComponent {
     metaSampleRateEl,
     metaChannelsEl,
     waveformEl,
-    tagTitleEl,
-    tagArtistEl,
-    tagDateEl,
-    tagGenreEl,
-    tagCommentEl,
-    tagCopyrightEl,
-    tagSoftwareEl,
+    tagInputEls,
     processingModeEls,
     processingModeLabelEl,
     processBtn,
@@ -49,16 +55,7 @@ export class AnalyzeView extends BaseComponent {
     this.processBtn = processBtn;
     this._processEnabled = false;
 
-    // Editable tag inputs, keyed by field name.
-    this._tagEls = {
-      title: tagTitleEl,
-      artist: tagArtistEl,
-      date: tagDateEl,
-      genre: tagGenreEl,
-      comment: tagCommentEl,
-      copyright: tagCopyrightEl,
-      software: tagSoftwareEl,
-    };
+    this._tagEls = tagInputsByField(tagInputEls);
 
     this._preview = new WaveformPreview({ containerEl: waveformEl, height: 164 });
   }

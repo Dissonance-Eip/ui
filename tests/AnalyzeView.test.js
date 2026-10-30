@@ -12,17 +12,10 @@ function makeView({ tagNames = TAG_NAMES } = {}) {
     metaSampleRateEl: new FakeElement(),
     metaChannelsEl: new FakeElement(),
   };
-  const tagInputs = Object.fromEntries(tagNames.map((name) => [name, new FakeElement()]));
-  const view = new AnalyzeView({
-    ...els,
-    tagTitleEl: tagInputs.title,
-    tagArtistEl: tagInputs.artist,
-    tagDateEl: tagInputs.date,
-    tagGenreEl: tagInputs.genre,
-    tagCommentEl: tagInputs.comment,
-    tagCopyrightEl: tagInputs.copyright,
-    tagSoftwareEl: tagInputs.software,
-  });
+  const tagInputs = Object.fromEntries(
+    tagNames.map((name) => [name, new FakeElement({ 'data-tag': name })])
+  );
+  const view = new AnalyzeView({ ...els, tagInputEls: Object.values(tagInputs) });
   return { view, els, tagInputs };
 }
 
@@ -152,6 +145,19 @@ describe('AnalyzeView tag inputs', () => {
 
     expect(onBlur).toHaveBeenCalledTimes(1);
     expect(onBlur.mock.calls[0][0]).toMatchObject({ artist: 'Band', title: '' });
+  });
+
+  it('ignores inputs whose data-tag is not a known field', () => {
+    const stray = new FakeElement({ 'data-tag': 'album' });
+    stray.value = 'Record';
+    const view = new AnalyzeView({ tagInputEls: [stray] });
+    const onBlur = vi.fn();
+    view.onTagBlur(onBlur);
+
+    stray.fire('blur');
+
+    expect(onBlur).not.toHaveBeenCalled();
+    expect(view.getMetadataTags()).not.toHaveProperty('album');
   });
 
   it('listens for blur on every tag input', () => {
