@@ -24,6 +24,7 @@
  */
 import { BaseController } from '../base/BaseController.js';
 import { TagWriteQueue } from '../services/TagWriteQueue.js';
+import { buildProcessingOptions } from '../utils/processingOptions.js';
 
 export class AppController extends BaseController {
   constructor({
@@ -214,6 +215,13 @@ export class AppController extends BaseController {
       return;
     }
 
+    const modes = this.analyzeView.getProcessingModes?.() ?? [];
+    const options = buildProcessingOptions(modes);
+    if (!options) {
+      this.logger?.setStatus?.('Select at least one processing mode');
+      return;
+    }
+
     const operationId = ++this._activeOperationId;
 
     try {
@@ -232,21 +240,6 @@ export class AppController extends BaseController {
       // before the core reads the input file.
       await this._pauseAndFlushTags();
 
-      const modes = this.analyzeView.getProcessingModes?.() ?? [];
-      const sliderValue = this.analyzeView.getProtectionStrength();
-
-      let options;
-      if (modes.length > 0) {
-        options = { modes, perturbation: 0.5 };
-      } else if (sliderValue > 0) {
-        const stacked = ['white_noise'];
-        if (sliderValue > 0.25) stacked.push('phase_distortion');
-        if (sliderValue > 0.5) stacked.push('spectral_gate');
-        if (sliderValue > 0.75) stacked.push('pink_noise');
-        options = { modes: stacked, perturbation: sliderValue };
-      } else {
-        options = {};
-      }
       const resp = await this.api.processFile(this.state.currentFilePath, options);
 
       if (operationId !== this._activeOperationId) {

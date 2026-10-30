@@ -28,7 +28,7 @@ There is no build for Intel Macs yet.
 ## Using Dissonance
 
 1. **Upload:** drop a WAV file on the window, or pick one from disk.
-2. **Analyze:** check the file's details, edit its tags, choose the protection strength, then **Process**.
+2. **Analyze:** check the file's details, edit its tags, choose the processing modes, then **Process**.
 3. **Compare:** listen to the original and the protected version side by side, then **Export** the protected file.
 
 Only WAV files are supported.
@@ -98,7 +98,7 @@ For an interactive test loop: `npm run test:watch`.
 The app has three top-level views, navigated linearly:
 
 1. **Upload** — drop a WAV or pick one from disk
-2. **Analyze** — view file info, edit tag metadata, scrub the waveform, choose protection strength, hit Process
+2. **Analyze** — view file info, edit tag metadata, scrub the waveform, choose processing modes, hit Process
 3. **Compare** — side-by-side waveform + info for original vs processed, then Export
 
 ### Editable metadata
@@ -110,9 +110,9 @@ Seven WAV tag fields (title, artist, date, genre, comment, copyright, software) 
 - Switching files or quitting → flushes pending writes first (no edits ever lost)
 - Writes are serialised so the underlying read-modify-write can't be raced
 
-### Protection strength
+### Protection modes
 
-Single slider (0–1, step 0.01) on the Analyze view, forwarded to the core as `options.perturbation`. The CLI also accepts `--perturbation` for headless runs.
+Processing is mode-driven. Select one or more modes on the Analyze view, then press Process. The modes are White Noise, Phase Distortion, Spectral Gate, and Pink Noise. This build uses the project's validated default protection strength; a strength control will return once every mode is finalized.
 
 ### Waveform
 

@@ -14,6 +14,7 @@ import { BaseComponent } from '../base/BaseComponent.js';
 import { WaveformPreview } from '../components/WaveformPreview.js';
 import { formatDuration, formatSampleRate, formatChannels } from '../utils/wavInfoFormatters.js';
 import { basename } from '../utils/pathUtils.js';
+import { canProcess } from '../utils/processingOptions.js';
 
 // Single source of truth for editable metadata fields.
 const TAG_FIELDS = ['title', 'artist', 'date', 'genre', 'comment', 'copyright', 'software'];
@@ -33,8 +34,6 @@ export class AnalyzeView extends BaseComponent {
     tagCommentEl,
     tagCopyrightEl,
     tagSoftwareEl,
-    protectionStrengthEl,
-    protectionStrengthValueEl,
     processingModeEls,
     processingModeLabelEl,
     processBtn,
@@ -45,8 +44,6 @@ export class AnalyzeView extends BaseComponent {
     this.metaDurationEl = metaDurationEl;
     this.metaSampleRateEl = metaSampleRateEl;
     this.metaChannelsEl = metaChannelsEl;
-    this.protectionStrengthEl = protectionStrengthEl;
-    this.protectionStrengthValueEl = protectionStrengthValueEl;
     this.processingModeEls = Array.from(processingModeEls || []);
     this.processingModeLabelEl = processingModeLabelEl;
     this.processBtn = processBtn;
@@ -70,17 +67,6 @@ export class AnalyzeView extends BaseComponent {
     super.mount();
     this._preview.mount();
     this.track(() => this._preview.unmount());
-
-    // Live readout for the protection slider — updates as the user drags.
-    if (this.protectionStrengthEl) {
-      const updateReadout = () => {
-        if (!this.protectionStrengthValueEl) return;
-        const pct = Math.round(parseFloat(this.protectionStrengthEl.value || '0') * 100);
-        this.protectionStrengthValueEl.textContent = `${pct}%`;
-      };
-      this.listen(this.protectionStrengthEl, 'input', updateReadout);
-      updateReadout();
-    }
 
     if (this.processingModeEls.length > 0) {
       const sync = () => this._syncProcessingControls();
@@ -184,23 +170,12 @@ export class AnalyzeView extends BaseComponent {
   // Buttons
   // ---------------------------------------------------------------------------
 
-  /**
-   * Read the current protection strength as a float in [0, 1].
-   * Falls back to 0.5 (the core's default) if the input is missing or NaN.
-   */
-  getProtectionStrength() {
-    const raw = this.protectionStrengthEl ? parseFloat(this.protectionStrengthEl.value) : NaN;
-    if (!Number.isFinite(raw)) return 0.5;
-    return Math.min(1, Math.max(0, raw));
-  }
-
   getProcessingModes() {
     return this.processingModeEls.filter((el) => el.checked).map((el) => el.value);
   }
 
   setProcessEnabled(enabled) {
     this._processEnabled = Boolean(enabled);
-    if (this.processBtn) this.processBtn.disabled = !enabled;
     this._syncProcessingControls();
   }
 
@@ -230,9 +205,8 @@ export class AnalyzeView extends BaseComponent {
       }
     }
 
-    const hasModes = selectedLabels.length > 0;
-    if (this.protectionStrengthEl) {
-      this.protectionStrengthEl.disabled = !this._processEnabled || hasModes;
+    if (this.processBtn) {
+      this.processBtn.disabled = !canProcess(this._processEnabled, selectedLabels);
     }
   }
 }
