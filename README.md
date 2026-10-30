@@ -83,13 +83,25 @@ npm run watch:css
 ```bash
 npm run lint           # eslint
 npm run format:check   # prettier --check
-npm test               # vitest run (unit tests)
+npm test               # vitest run (unit tests + addon integration test)
 npm run build          # electron-builder --dir (unpacked .app for testing)
 ```
 
 All four are gated by CI on every push/PR.
 
 For an interactive test loop: `npm run test:watch`.
+
+### Test coverage
+
+```bash
+npm run test:coverage
+```
+
+Prints a per-file coverage table and writes a report to `coverage/` (git-ignored; open `coverage/index.html` for the browsable version). Every source file is counted, including files that no test imports, so the total reflects the real state of the project. The team target is 50% line coverage; it is not enforced yet. CI prints the total line coverage in the job summary.
+
+### Addon integration test
+
+`tests/coreAddon.integration.test.js` runs the real core addon from `Build/Release/` through the same `CoreAddonLoader` the app uses. It generates its own WAV fixtures, so no audio is committed. It checks that a processed file is a valid WAV with the same duration, sample rate and channels, and covers Beta 1 regressions (non-WAV input, truncated WAV, 0% strength). The 0% strength tests are marked `it.fails` until the addon is fixed (ui#83). On a platform with no matching addon binary the test is skipped with a warning.
 
 ---
 
@@ -180,4 +192,6 @@ Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag bu
 
 ## License
 
-MIT. See repository root.
+The Dissonance desktop app (this repository) is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The bundled audio engine addon (`Build/Release/*.node`, built from the closed-source `core` repository) is proprietary and is not covered by the Apache License 2.0.
