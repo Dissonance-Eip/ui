@@ -6,10 +6,10 @@
  * `event.sender`:
  *   UiLogForwarder      — `ui:log` channel for renderer console forwarding
  *   FileDialogHandlers  — `dialog:openFile`
+ *   themeHandlers       — `ui:getSystemTheme` + `ui:systemTheme` push to every window
  *   coreSetup           — `core:*` handlers (process, readMetadata, writeTags, export, cleanup)
  *
  * registerWindowHandlers(win) runs for each new window:
- *   themeHandlers       — `ui:getSystemTheme` + `ui:systemTheme` push to that window
  *   releaseCoreWindow   — drop the window's tag baselines once it is closed
  */
 const { UiLogForwarder } = require('./UiLogForwarder');
@@ -20,11 +20,11 @@ const { registerCoreHandlers, releaseCoreWindow } = require('./core/coreSetup');
 function registerFileHandlers() {
   new UiLogForwarder().register();
   new FileDialogHandlers().register();
+  registerThemeHandlers();
   registerCoreHandlers();
 }
 
 function registerWindowHandlers(win) {
-  registerThemeHandlers(win);
   const webContentsId = win.webContents.id;
   win.on('closed', () => releaseCoreWindow(webContentsId));
 }
