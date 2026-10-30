@@ -23,7 +23,7 @@
  *     When the addon is fixed they will start failing as "unexpectedly
  *     passing": remove `.fails` at that point.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -130,15 +130,12 @@ describe.skipIf(!binaryExpected)('core addon integration (real addon)', () => {
   const outPath = (name) => path.join(tmpDir, name);
 
   beforeAll(() => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    try {
-      addon = new CoreAddonLoader().load();
-    } finally {
-      logSpy.mockRestore();
-    }
+    const silent = { log: () => {}, warn: () => {} };
+    const result = new CoreAddonLoader({ logger: silent }).load();
+    addon = result.addon;
     if (!addon) {
       throw new Error(
-        'An addon binary exists for this platform but CoreAddonLoader could not load it.'
+        `An addon binary exists for this platform but CoreAddonLoader could not load it: ${result.error.message}`
       );
     }
 

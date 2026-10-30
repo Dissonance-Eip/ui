@@ -23,6 +23,17 @@ export function makeIpc() {
   return ipc;
 }
 
+/** ipcMain double that also records invoke handlers like ipcMain.handle(). */
+export function makeHandlingIpc() {
+  const ipc = makeIpc();
+  ipc.handlers = new Map();
+  ipc.handle = vi.fn((channel, handler) => {
+    if (ipc.handlers.has(channel)) throw new Error(`second handler for ${channel}`);
+    ipc.handlers.set(channel, handler);
+  });
+  return ipc;
+}
+
 /**
  * Makes a webContents that answers every request on `requestChannel` by
  * sending `doneChannel` back through `ipc` with the same requestId.

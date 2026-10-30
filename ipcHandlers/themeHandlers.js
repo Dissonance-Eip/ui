@@ -18,8 +18,9 @@ const childProcess = require('child_process');
 const { getSystemThemeMode, LINUX_PLATFORM } = require('./theme/systemThemeMode');
 const { watchLinuxThemeSettings } = require('./theme/linuxDesktopTheme');
 const { createThemeForwarder } = require('./theme/themeForwarder');
+const { IpcChannels } = require('./ipcChannels');
 
-const GET_SYSTEM_THEME_CHANNEL = 'ui:getSystemTheme';
+const GET_SYSTEM_THEME_CHANNEL = IpcChannels.UI_GET_SYSTEM_THEME;
 const NATIVE_THEME_UPDATED_EVENT = 'updated';
 
 function electronDeps() {
