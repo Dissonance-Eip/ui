@@ -11,6 +11,11 @@
  */
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+// Set by main for development builds only (main/windowSecurity.js
+// DEV_MODE_ARG). A sandboxed preload cannot require that module, hence
+// the literal.
+const IS_DEVELOPMENT = process.argv.includes('--dissonance-dev');
+
 console.log('Preload script loaded (ui/preload.js)');
 
 /**
@@ -63,4 +68,5 @@ contextBridge.exposeInMainWorld('dissonance', {
   logToMain: (level, message) => ipcRenderer.send('ui:log', { level, message }),
   onCoreStatus: (cb) => subscribe('core:status', cb),
   onSystemTheme: (cb) => subscribe('ui:systemTheme', cb),
+  isDevelopment: () => IS_DEVELOPMENT,
 });

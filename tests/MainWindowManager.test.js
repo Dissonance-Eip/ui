@@ -1,9 +1,33 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { MainWindowManager } from '../main/MainWindowManager.js';
+import { DEV_MODE_ARG } from '../main/windowSecurity.js';
 import { makeBrowserWindowClass } from './helpers/fakeElectron.js';
 
-function makeManager(BrowserWindowClass = makeBrowserWindowClass()) {
-  return new MainWindowManager({ preloadPath: '/preload.js', iconPath: null, BrowserWindowClass });
+const INDEX_PATH = '/app/index.html';
+const APP_URL = pathToFileURL(INDEX_PATH).href;
+
+function makeManager({
+  BrowserWindowClass = makeBrowserWindowClass(),
+  isDevelopment = false,
+  openExternal = vi.fn(),
+} = {}) {
+  return new MainWindowManager({
+    preloadPath: '/preload.js',
+    iconPath: null,
+    indexPath: INDEX_PATH,
+    isDevelopment,
+    openExternal,
+    BrowserWindowClass,
+  });
+}
+
+/** Fakes a renderer-initiated navigation and returns the (cancellable) event. */
+function navigate(win, url) {
+  const event = { url, preventDefault: vi.fn() };
+  win.webContents.emit('will-navigate', event, url);
+  return event;
 }
 
 describe('MainWindowManager', () => {
@@ -15,16 +39,6 @@ describe('MainWindowManager', () => {
 
     expect(second).not.toBe(first);
     expect(manager.getWindows()).toEqual([first, second]);
-  });
-
-  it('keeps renderer isolation on for every window', () => {
-    const win = makeManager().createWindow();
-
-    expect(win.options.webPreferences).toEqual({
-      preload: '/preload.js',
-      contextIsolation: true,
-      nodeIntegration: false,
-    });
   });
 
   it('forgets a window once it is closed and keeps the others', () => {
@@ -39,7 +53,7 @@ describe('MainWindowManager', () => {
 
   it("uses Electron's list of open windows as the only source", () => {
     const BrowserWindowClass = makeBrowserWindowClass();
-    const manager = makeManager(BrowserWindowClass);
+    const manager = makeManager({ BrowserWindowClass });
     const created = manager.createWindow();
     const openedElsewhere = new BrowserWindowClass();
 
@@ -53,5 +67,112 @@ describe('MainWindowManager', () => {
     manager.getWindows().pop();
 
     expect(manager.getWindows()).toHaveLength(1);
+  });
+});
+
+describe('MainWindowManager window hardening', () => {
+  it('isolates and sandboxes the renderer of every window', () => {
+    const manager = makeManager();
+
+    const windows = [manager.createWindow(), manager.createWindow()];
+
+    for (const win of windows) {
+      expect(win.options.webPreferences).toEqual({
+        preload: '/preload.js',
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+        webSecurity: true,
+        additionalArguments: [],
+      });
+    }
+  });
+
+  it('flags the renderer as development only in development', () => {
+    const devWin = makeManager({ isDevelopment: true }).createWindow();
+    const prodWin = makeManager({ isDevelopment: false }).createWindow();
+
+    expect(devWin.options.webPreferences.additionalArguments).toEqual([DEV_MODE_ARG]);
+    expect(prodWin.options.webPreferences.additionalArguments).not.toContain(DEV_MODE_ARG);
+  });
+
+  it('uses the same development flag as the preload script reads', () => {
+    const preloadSource = readFileSync(new URL('../preload.js', import.meta.url), 'utf8');
+
+    expect(preloadSource).toContain(`process.argv.includes('${DEV_MODE_ARG}')`);
+  });
+
+  it('lets the window reload its own page', () => {
+    const win = makeManager().createWindow();
+
+    const event = navigate(win, `${APP_URL}#analyze`);
+
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('blocks navigation to a local file such as a dropped audio file', () => {
+    const openExternal = vi.fn();
+    const win = makeManager({ openExternal }).createWindow();
+
+    const event = navigate(win, 'file:///Users/someone/Music/song.wav');
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('blocks navigation to a web page and opens it in the system browser instead', () => {
+    const openExternal = vi.fn();
+    const win = makeManager({ openExternal }).createWindow();
+
+    const event = navigate(win, 'https://example.com/docs');
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/docs');
+  });
+
+  it('blocks a navigation it cannot parse', () => {
+    const openExternal = vi.fn();
+    const win = makeManager({ openExternal }).createWindow();
+
+    const event = navigate(win, 'not a url');
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('never opens a new app window and sends web links to the system browser', () => {
+    const openExternal = vi.fn();
+    const win = makeManager({ openExternal }).createWindow();
+
+    const result = win.webContents.windowOpenHandler({ url: 'https://example.com/' });
+
+    expect(result).toEqual({ action: 'deny' });
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/');
+  });
+
+  it.each(['file:///etc/hosts', 'javascript:alert(1)', `${APP_URL}`, 'smb://host/share'])(
+    'denies window.open(%s) without opening anything',
+    (url) => {
+      const openExternal = vi.fn();
+      const win = makeManager({ openExternal }).createWindow();
+
+      const result = win.webContents.windowOpenHandler({ url });
+
+      expect(result).toEqual({ action: 'deny' });
+      expect(openExternal).not.toHaveBeenCalled();
+    }
+  );
+
+  it('hardens a second window the same way as the first', () => {
+    const openExternal = vi.fn();
+    const manager = makeManager({ openExternal });
+    manager.createWindow();
+    const second = manager.createWindow();
+
+    const event = navigate(second, 'https://example.com/');
+    const result = second.webContents.windowOpenHandler({ url: 'file:///etc/hosts' });
+
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(result).toEqual({ action: 'deny' });
   });
 });
