@@ -13,7 +13,10 @@
  *   • export → copy temp to user location → reset to upload
  *   • restart (always-visible button, any screen) → flush + reset to upload,
  *     discarding any in-flight processing result via the operation id
- *   • quit flush request → pause, snapshot form, drain, notify main
+ *   • quit/close flush request → pause, snapshot form, drain (preload answers main)
+ *   • another window about to rewrite the shown file → pause its players
+ *   • another window rewrote the shown file → save own edits, re-read tags,
+ *     reload the players (the audio data may have moved in the file)
  *
  * Compare's content is only populated once the processing screen is showing
  * — never while `#view-compare` itself is hidden — so the waveform players
@@ -130,11 +133,15 @@ export class AppController extends BaseController {
       this.track(() => this.restartBtn.removeEventListener('click', onRestart));
     }
 
-    // Before the app quits: pause playback, drain the queue, signal main.
-    window.dissonance.onAppFlushRequest(async () => {
-      await this._pauseAndFlushTags();
-      window.dissonance.notifyFlushDone();
-    });
+    // Before this window closes or the app quits: pause playback and drain
+    // the queue. The preload tells main once this promise settles.
+    window.dissonance.onAppFlushRequest(() => this._pauseAndFlushTags());
+
+    // Another window is rewriting the tags of a file (see TagWriteCoordinator).
+    this.track(this.api.onPauseFileRequest((request) => this.pauseIfShowing(request?.filePath)));
+    this.track(
+      this.api.onTagsWrittenElsewhere((event) => this.refreshAfterWriteElsewhere(event?.filePath))
+    );
 
     // Prevent the browser/Electron from navigating to the dropped file.
     window.addEventListener('dragover', this._onGlobalDragOver);
@@ -358,14 +365,47 @@ export class AppController extends BaseController {
    * Called from importFile, processCurrentFile, and the quit flush handler.
    */
   async _pauseAndFlushTags() {
-    this.analyzeView.pauseAudioPreview();
-    this.compareView.pauseAudioPreviews?.();
+    this._pauseAllPreviews();
 
     if (this.state.currentFilePath) {
       this._tagQueue.enqueue(this.state.currentFilePath, this.analyzeView.getMetadataTags());
     }
 
     await this._tagQueue.flush();
+  }
+
+  /** Pause every audio preview in this window (analyze + both compare players). */
+  _pauseAllPreviews() {
+    this.analyzeView.pauseAudioPreview();
+    this.compareView.pauseAudioPreviews?.();
+  }
+
+  /**
+   * Another window is about to rewrite `filePath`. Pause every player
+   * streaming it here — the core truncates and rewrites the WAV, the same
+   * reason the tag queue never writes while this window plays. Synchronous
+   * so main can write as soon as the preload answers.
+   */
+  pauseIfShowing(filePath) {
+    if (!filePath || filePath !== this.state.currentFilePath) return;
+    this._pauseAllPreviews();
+  }
+
+  /**
+   * Another window rewrote `filePath`. Save this window's own edits first
+   * (main merges them field by field), then show the file's current tags
+   * and reload the players so they re-read the rewritten file.
+   */
+  async refreshAfterWriteElsewhere(filePath) {
+    if (!filePath || filePath !== this.state.currentFilePath) return;
+    try {
+      await this._pauseAndFlushTags();
+      await this._readFileMetadata(filePath);
+      this.analyzeView.setAudioPreviewFile(filePath);
+      if (this.state.hasProcessedFile()) this.compareView.setOriginalAudioPreviewFile(filePath);
+    } catch (err) {
+      this.logger?.error?.(`Refreshing after another window's edit failed: ${err}`);
+    }
   }
 
   _showAnalyze() {
@@ -388,8 +428,7 @@ export class AppController extends BaseController {
   }
 
   _resetToUpload() {
-    this.analyzeView.pauseAudioPreview();
-    this.compareView.pauseAudioPreviews?.();
+    this._pauseAllPreviews();
     this.state.setCurrentFilePath(null);
     this._originalBasicInfo = null;
     this._processedBasicInfo = null;

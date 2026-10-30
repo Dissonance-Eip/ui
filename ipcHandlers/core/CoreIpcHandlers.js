@@ -7,31 +7,28 @@
  *   core:export           → copy a processed temp file to a user-chosen path
  *   core:cleanupProcessed → unlink a tracked temp file
  *
- * Constructed once by coreSetup.js with the loaded addon + a shared
- * TempFileManager injected. Status events ("processing", "processed",
- * "error", "exported") are pushed back to the renderer on `core:status`.
+ * Constructed once by coreSetup.js with the loaded addon, a shared
+ * TempFileManager, the per-file lock and the TagWriteCoordinator injected,
+ * and registered once for all windows. Status events ("processing",
+ * "processed", "error", "exported") go back on `core:status` to the window
+ * that made the request (`event.sender`), never to a fixed window.
  */
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
+const { senderOf, sendToRenderer } = require('../rendererMessaging');
 
-function forward(win, channel, payload) {
-  try {
-    if (win && win.webContents && typeof win.webContents.send === 'function') {
-      win.webContents.send(channel, payload);
-    }
-  } catch (e) {
-    console.error('Failed to forward', channel, e);
-  }
-}
+const STATUS_CHANNEL = 'core:status';
 
 class CoreIpcHandlers {
-  constructor({ coreAddon, tempFileManager }) {
+  constructor({ coreAddon, tempFileManager, fileLock, tagWriteCoordinator }) {
     this.coreAddon = coreAddon;
     this.tempFileManager = tempFileManager;
+    this.fileLock = fileLock;
+    this.tagWriteCoordinator = tagWriteCoordinator;
   }
 
-  register(mainWindow) {
+  register() {
     ipcMain.handle('core:cleanupProcessed', async (_event, payload) => {
       const processedPath =
         typeof payload === 'string' ? payload : (payload && payload.processedPath) || null;
@@ -41,17 +38,16 @@ class CoreIpcHandlers {
       return { ok: true };
     });
 
-    ipcMain.handle('core:process', async (_event, payload) => {
+    ipcMain.handle('core:process', async (event, payload) => {
       const filePath = payload?.filePath ?? null;
       const userOptions = payload?.options ?? {};
+      const { sender, senderId } = senderOf(event);
 
-      if (!mainWindow) return { ok: false, error: 'No main window' };
       if (!filePath || typeof filePath !== 'string')
         return { ok: false, error: 'No file path provided' };
       if (!this.coreAddon || typeof this.coreAddon.process !== 'function')
         return { ok: false, error: 'Core addon not available' };
 
-      const senderId = _event?.sender?.id ?? null;
       if (senderId) await this.tempFileManager.cleanupForSender(senderId);
 
       // Generate a temp output path so processed files don't land next to
@@ -62,14 +58,20 @@ class CoreIpcHandlers {
       const outputPath = this.tempFileManager.makeTempProcessedPath(filePath);
       const addonOptions = { ...userOptions, outputPath };
 
-      forward(mainWindow, 'core:status', { status: 'processing', message: 'Processing started' });
+      sendToRenderer(sender, STATUS_CHANNEL, {
+        status: 'processing',
+        message: 'Processing started',
+      });
 
       try {
-        const result = await this.coreAddon.process(filePath, addonOptions);
+        // Under the file lock so another window can't rewrite the input's tags mid-read.
+        const result = await this.fileLock.runExclusive(filePath, () =>
+          this.coreAddon.process(filePath, addonOptions)
+        );
         const processedPath = result?.processedPath ?? outputPath;
         this.tempFileManager.registerForSender(senderId, processedPath);
 
-        forward(mainWindow, 'core:status', {
+        sendToRenderer(sender, STATUS_CHANNEL, {
           status: 'processed',
           message: 'Processing complete',
           processedPath,
@@ -77,7 +79,7 @@ class CoreIpcHandlers {
         return { ok: true, processedPath };
       } catch (err) {
         console.error('Core addon processing error', err);
-        forward(mainWindow, 'core:status', {
+        sendToRenderer(sender, STATUS_CHANNEL, {
           status: 'error',
           message: 'Processing failed',
           error: String(err),
@@ -86,20 +88,20 @@ class CoreIpcHandlers {
       }
     });
 
-    ipcMain.handle('core:readMetadata', async (_event, filePath) => {
+    ipcMain.handle('core:readMetadata', async (event, filePath) => {
       if (!filePath || typeof filePath !== 'string')
         return { ok: false, error: 'No file path provided' };
       if (!this.coreAddon || typeof this.coreAddon.readMetadata !== 'function')
         return { ok: false, error: 'Core addon readMetadata not available' };
       try {
-        return await this.coreAddon.readMetadata(filePath);
+        return await this.tagWriteCoordinator.readMetadata(senderOf(event).senderId, filePath);
       } catch (err) {
         console.error('core:readMetadata error', err);
         return { ok: false, error: String(err) };
       }
     });
 
-    ipcMain.handle('core:writeTags', async (_event, payload) => {
+    ipcMain.handle('core:writeTags', async (event, payload) => {
       const filePath = payload && payload.filePath ? payload.filePath : null;
       const tags = payload && payload.tags ? payload.tags : {};
 
@@ -108,21 +110,20 @@ class CoreIpcHandlers {
         return { ok: false, error: 'Core addon writeTags not available' };
 
       try {
-        const result = await this.coreAddon.writeTags(filePath, tags);
-        return result;
+        return await this.tagWriteCoordinator.writeTags(senderOf(event).senderId, filePath, tags);
       } catch (err) {
         console.error('core:writeTags error', err);
         return { ok: false, error: String(err) };
       }
     });
 
-    ipcMain.handle('core:export', async (_event, payload) => {
+    ipcMain.handle('core:export', async (event, payload) => {
       const processedPathStr =
         typeof payload === 'string' ? payload : (payload && payload.processedPath) || null;
       const destPath = (payload && payload.destPath) || null;
 
       if (!processedPathStr) return { ok: false, error: 'No processed file path' };
-      if (!mainWindow) return { ok: false, error: 'No main window' };
+      const { sender } = senderOf(event);
 
       try {
         let canceled = false;
@@ -147,7 +148,7 @@ class CoreIpcHandlers {
 
         await this.tempFileManager.cleanupTempFile(processedPathStr);
 
-        forward(mainWindow, 'core:status', {
+        sendToRenderer(sender, STATUS_CHANNEL, {
           status: 'exported',
           message: `Exported to ${filePath}`,
           exportedPath: filePath,
@@ -156,7 +157,7 @@ class CoreIpcHandlers {
         return { ok: true, exportedPath: filePath };
       } catch (err) {
         console.error('Export error', err);
-        forward(mainWindow, 'core:status', { status: 'error', message: 'Export failed' });
+        sendToRenderer(sender, STATUS_CHANNEL, { status: 'error', message: 'Export failed' });
         return { ok: false, error: String(err) };
       }
     });

@@ -1,31 +1,30 @@
 /**
- * Wraps the single application BrowserWindow.
- * Holds the configured preload path, creates the window on first request,
- * and exposes `getWindow()` so other modules don't have to track lifecycle.
+ * Creates the application BrowserWindows.
+ * Holds the configured preload path, creates a new window on every request
+ * (a second launch opens a second window, see main/singleInstance.js), and
+ * exposes `getWindows()`: Electron's own list of open windows
+ * (`BrowserWindow.getAllWindows()`), the single source for "open windows".
  * contextIsolation is on / nodeIntegration is off (renderer security).
  */
-const { BrowserWindow } = require('electron');
 const fs = require('fs');
 
 const MIN_WINDOW_WIDTH = 560;
 const MIN_WINDOW_HEIGHT = 680;
 
 class MainWindowManager {
-  constructor({ preloadPath, iconPath }) {
+  constructor({ preloadPath, iconPath, BrowserWindowClass = require('electron').BrowserWindow }) {
     this.preloadPath = preloadPath;
     this.iconPath = iconPath;
-    this._window = null;
+    this._BrowserWindow = BrowserWindowClass;
   }
 
   createWindow({ width = 800, height = 700 } = {}) {
-    if (this._window) return this._window;
-
     // Only Windows/Linux respect this for the app icon — macOS uses the
     // Dock icon set separately (see MainApplication#_applyDockIcon). Guard
     // on existence so a missing resources/icon.png doesn't error out.
     const hasIcon = this.iconPath && fs.existsSync(this.iconPath);
 
-    this._window = new BrowserWindow({
+    const win = new this._BrowserWindow({
       width,
       height,
       ...(hasIcon ? { icon: this.iconPath } : {}),
@@ -38,23 +37,20 @@ class MainWindowManager {
       },
     });
 
-    this._window.once('ready-to-show', () => {
+    win.once('ready-to-show', () => {
       try {
-        this._window.show();
+        win.show();
       } catch (_e) {
         // ignore
       }
     });
 
-    this._window.on('closed', () => {
-      this._window = null;
-    });
-
-    return this._window;
+    return win;
   }
 
-  getWindow() {
-    return this._window;
+  /** Open windows, as Electron lists them. Returns a new array on every call. */
+  getWindows() {
+    return this._BrowserWindow.getAllWindows();
   }
 }
 
