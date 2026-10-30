@@ -134,6 +134,8 @@ The C++ core is invoked via IPC channels prefixed `core:` — see "IPC channels"
 
 ## IPC channels
 
+The main side takes every name from `ipcHandlers/ipcChannels.js`. The sandboxed `preload.js` can't import it and keeps string literals, so `tests/ipcContract.test.js` checks that each of its channels exists there and has a main handler.
+
 | Channel                                | Purpose                                                      |
 | -------------------------------------- | ------------------------------------------------------------ |
 | `dialog:openFile`                      | Native file picker (audio formats)                           |
@@ -154,13 +156,16 @@ The main process loads the native addon at startup via `CoreAddonLoader`:
 
 - Loader: `ipcHandlers/core/CoreAddonLoader.js`
 - Default location: `Build/Release/dissonance_core-${platform}-${arch}.node`
-- Falls back to `Build/Release/dissonance_core.node`, the `dissonance-core` npm package, then node-bindings
+- Falls back to `Build/Release/dissonance_core.node`, `build/Release/`, then node-bindings; paths that don't exist are skipped
+- `load()` returns `{ addon, source, error }`. If no strategy works, the `core:*` channels that need the addon reply with `code: 'ENGINE_UNAVAILABLE'` and the loader's `reason`
 
 ### Override the addon path
 
 ```bash
 DISSONANCE_CORE_ADDON_PATH=/absolute/path/to/dissonance_core.node npm run dev
 ```
+
+A relative path is resolved against the directory you launch from.
 
 ### Syncing binaries from the core repo
 

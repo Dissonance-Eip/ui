@@ -7,9 +7,10 @@
  * unresponsive renderer can never hang close or quit.
  */
 const { requestRendererAck } = require('../ipcHandlers/rendererMessaging');
+const { IpcChannels } = require('../ipcHandlers/ipcChannels');
 
-const FLUSH_REQUEST_CHANNEL = 'app:flushRequest';
-const FLUSH_DONE_CHANNEL = 'app:flushDone';
+const FLUSH_REQUEST_CHANNEL = IpcChannels.APP_FLUSH_REQUEST;
+const FLUSH_DONE_CHANNEL = IpcChannels.APP_FLUSH_DONE;
 const FLUSH_TIMEOUT_MS = 3000;
 
 const CloseFlushState = Object.freeze({ IDLE: 'idle', PENDING: 'pending', DONE: 'done' });

@@ -4,10 +4,12 @@
  * and prefixes everything with `[UI]`.
  */
 const { ipcMain } = require('electron');
+const { IpcChannels } = require('./ipcChannels');
 
 class UiLogForwarder {
-  register() {
-    ipcMain.on('ui:log', (_event, payload) => {
+  /** @param {import('events').EventEmitter} [ipc] ipcMain, or a test double */
+  register(ipc = ipcMain) {
+    ipc.on(IpcChannels.UI_LOG, (_event, payload) => {
       try {
         const level = payload && payload.level ? String(payload.level) : 'log';
         const message = payload && payload.message != null ? String(payload.message) : '';

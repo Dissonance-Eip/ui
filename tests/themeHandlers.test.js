@@ -1,22 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { registerThemeHandlers } from '../ipcHandlers/themeHandlers.js';
-import { makeBrowserWindowClass, makeIpc } from './helpers/fakeElectron.js';
+import { makeBrowserWindowClass, makeHandlingIpc } from './helpers/fakeElectron.js';
 
 const GNOME_ENV = { XDG_CURRENT_DESKTOP: 'GNOME' };
 const GNOME_THEME_KEY_COUNT = 2; // color-scheme + gtk-theme
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-/** ipcMain double that also records invoke handlers like ipcMain.handle(). */
-function makeHandlingIpc() {
-  const ipc = makeIpc();
-  ipc.handlers = new Map();
-  ipc.handle = vi.fn((channel, handler) => {
-    if (ipc.handlers.has(channel)) throw new Error(`second handler for ${channel}`);
-    ipc.handlers.set(channel, handler);
-  });
-  return ipc;
-}
 
 /** child_process.spawn double returning controllable `gsettings monitor` children. */
 function makeSpawn() {

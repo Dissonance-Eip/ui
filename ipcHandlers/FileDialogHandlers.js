@@ -6,10 +6,12 @@
  */
 const { ipcMain, dialog } = require('electron');
 const path = require('path');
+const { IpcChannels } = require('./ipcChannels');
 
 class FileDialogHandlers {
-  register() {
-    ipcMain.handle('dialog:openFile', async (_event, lastFilePath) => {
+  /** @param {{handle: Function}} [ipc] ipcMain, or a test double */
+  register(ipc = ipcMain) {
+    ipc.handle(IpcChannels.DIALOG_OPEN_FILE, async (_event, lastFilePath) => {
       const { canceled, filePaths } = await dialog.showOpenDialog({
         properties: ['openFile'],
         defaultPath:

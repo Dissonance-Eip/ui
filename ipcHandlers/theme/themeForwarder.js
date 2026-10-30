@@ -7,8 +7,9 @@
  * `electron` import; delivery goes through the shared sendToRenderer().
  */
 const { sendToRenderer } = require('../rendererMessaging');
+const { IpcChannels } = require('../ipcChannels');
 
-const SYSTEM_THEME_CHANNEL = 'ui:systemTheme';
+const SYSTEM_THEME_CHANNEL = IpcChannels.UI_SYSTEM_THEME;
 
 /**
  * @param {{ getWindows: () => object[], resolveMode: () => Promise<string> }} deps
