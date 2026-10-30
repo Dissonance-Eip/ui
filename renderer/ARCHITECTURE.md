@@ -68,7 +68,7 @@ The Analyze view and the Compare view both display waveforms via the `WaveformPr
 
 - Player create / `loadTrack` / destroy lifecycle.
 - Suppression of `WaveformPlayer.loadTrack()`'s unconditional auto-play (it replaces `.play` with a no-op for the duration of the call, then restores).
-- `file://` URL conversion for absolute paths.
+- `file://` URL conversion for absolute paths via `renderer/utils/fileUrl.js`, which percent-encodes each path segment so names with `#`, `?`, `%`, spaces or non-ASCII characters load correctly (POSIX, Windows drive and UNC paths).
 - In-place theme repaint on `dissonance:theme`: the new colours (`renderer/utils/waveformColors.js`) are applied to the live player and its canvas is redrawn. The player and its audio element are kept, so playback never pauses, restarts or reloads the file.
 - Hold-and-drag scrubbing via pointer events on the canvas (the library only ships click-to-seek).
 - Audio `play` / `pause` / `ended` event forwarding via `onPlaybackStateChange`, used by `AppController` to toggle the TagWriteQueue's blocked state.
