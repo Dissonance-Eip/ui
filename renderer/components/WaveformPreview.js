@@ -1,5 +1,6 @@
 import { BaseComponent } from '../base/BaseComponent.js';
 import { DARK_MODE, LIGHT_MODE, getWaveformColors } from '../utils/waveformColors.js';
+import { toFileUrl } from '../utils/fileUrl.js';
 
 // Tailwind's dark-mode class, toggled on <html> by SystemThemeWatcher.
 const DARK_THEME_CLASS = 'dark';
@@ -10,7 +11,7 @@ const DARK_THEME_CLASS = 'dark';
  * Encapsulates:
  *   - Player create / loadTrack / destroy lifecycle
  *   - Suppression of WaveformPlayer's unconditional auto-play in loadTrack()
- *   - file:// URL conversion for absolute paths
+ *   - file:// URL conversion for absolute paths (via utils/fileUrl.js)
  *   - In-place theme repaint on `dissonance:theme` event (the player and
  *     its audio element are kept, so playback is never interrupted)
  *   - Audio play/pause/ended event forwarding via onPlaybackStateChange
@@ -59,7 +60,7 @@ export class WaveformPreview extends BaseComponent {
     }
     this._currentFilePath = filePath;
 
-    const url = WaveformPreview._toFileUrl(filePath);
+    const url = toFileUrl(filePath);
     if (!url) {
       this.clear();
       return;
@@ -246,14 +247,6 @@ export class WaveformPreview extends BaseComponent {
       player.drawWaveform?.();
     } catch (_e) {
       // ignore — cosmetic only
-    }
-  }
-
-  static _toFileUrl(filePath) {
-    try {
-      return new URL(`file://${filePath}`).toString();
-    } catch (_e) {
-      return null;
     }
   }
 

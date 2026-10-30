@@ -93,3 +93,19 @@ describe('WaveformPreview — theme change during playback', () => {
     expect(player.drawWaveform).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('WaveformPreview — file paths with URL-special characters (ui#113)', () => {
+  it('hands the player a URL that keeps #, ? and % in the path', async () => {
+    const preview = new WaveformPreview({ containerEl: {} });
+    const loadTrack = vi.fn(() => Promise.resolve());
+    preview._player = { loadTrack, play: vi.fn() };
+    const filePath = '/music/a#b?c%d.wav';
+
+    preview.setFile(filePath);
+
+    const url = new URL(loadTrack.mock.calls[0][0]);
+    expect(url.search).toBe('');
+    expect(url.hash).toBe('');
+    expect(decodeURIComponent(url.pathname)).toBe(filePath);
+  });
+});
