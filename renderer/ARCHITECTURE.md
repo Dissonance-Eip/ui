@@ -15,7 +15,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
 - `renderer/app/`
   - `bootstrap.js` — composition root for the renderer. The only place that constructs and wires dependencies.
 - `renderer/base/`
-  - `Disposable.js` — tracks cleanups/unsubscribes in LIFO order.
+  - `Disposable.js` — tracks cleanups/unsubscribes in LIFO order. A failing cleanup doesn't stop the rest; `dispose()` then throws an `AggregateError` of the failures.
   - `BaseComponent.js` — mount/unmount lifecycle + tracked `listen()` for events.
   - `BaseController.js` — start() hook on top of Disposable; `dispose()` tears it down.
   - `BaseApi.js` — defensive wrapper around the preload bridge.
@@ -33,8 +33,9 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.
 - `renderer/views/`
   - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
-  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button.
+  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button. Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
+  - `renderWavInfo.js` — writes a WAV info panel (filename, duration, sample rate, channels); shared by AnalyzeView and CompareView.
 - `renderer/components/`
   - `DropZone.js` — drag/drop + click-to-open file picker. Falls back to the native dialog when a dropped file has no resolvable path.
   - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, in-place theme repaint (keeps the player and its audio, so playback continues), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
