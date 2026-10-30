@@ -124,7 +124,7 @@ Single slider (0–1, step 0.01) on the Analyze view, forwarded to the core as `
 
 See [`renderer/ARCHITECTURE.md`](renderer/ARCHITECTURE.md) for the full folder map. Quick view:
 
-- **Main process** (`main/`, `ipcHandlers/`) — single window manager, IPC handlers split by responsibility, single composition root in `fileHandlers.js`
+- **Main process** (`main/`, `ipcHandlers/`) — window manager (one process, several windows), IPC handlers split by responsibility, single composition root in `fileHandlers.js`
 - **Preload** (`preload.js`) — minimal contextBridge exposing `window.dissonance.*`
 - **Renderer** (`renderer/`) — composition root in `app/bootstrap.js`, then `controllers/` → `views/` + `components/` + `services/` + `infrastructure/`
 

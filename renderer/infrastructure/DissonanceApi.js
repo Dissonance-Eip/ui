@@ -46,4 +46,12 @@ export class DissonanceApi extends BaseApi {
   onSystemTheme(cb) {
     return this._call('onSystemTheme', cb);
   }
+
+  onPauseFileRequest(cb) {
+    return this._call('onPauseFileRequest', cb);
+  }
+
+  onTagsWrittenElsewhere(cb) {
+    return this._call('onTagsWrittenElsewhere', cb);
+  }
 }

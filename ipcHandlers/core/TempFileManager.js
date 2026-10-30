@@ -15,6 +15,9 @@
 const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
+const { randomUUID } = require('crypto');
+
+const UNIQUE_SUFFIX_LENGTH = 8;
 
 class TempFileManager {
   constructor({ rootDir } = {}) {
@@ -26,11 +29,14 @@ class TempFileManager {
   /**
    * Build a unique processed-output path under the temp root. Doesn't create
    * the file — just generates the path. The directory is ensured on first use.
+   * The random suffix keeps two windows processing same-named inputs in the
+   * same millisecond from writing to one path.
    */
   makeTempProcessedPath(inputPath) {
     const base = path.basename(inputPath, path.extname(inputPath) || '.wav');
     const stamp = Date.now();
-    return path.join(this.rootDir, `${base}-processed-${stamp}.wav`);
+    const unique = randomUUID().slice(0, UNIQUE_SUFFIX_LENGTH);
+    return path.join(this.rootDir, `${base}-processed-${stamp}-${unique}.wav`);
   }
 
   async ensureRootDir() {
