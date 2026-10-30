@@ -4,7 +4,7 @@
  *   core:process          → run the audio pipeline on a WAV, output to temp
  *   core:readMetadata     → header + LIST/INFO tag parse (no audio decode)
  *   core:writeTags        → write LIST/INFO tags into an existing WAV
- *   core:export           → copy a processed temp file to a user-chosen path
+ *   core:export           → copy a tracked temp file to a path picked in the save dialog
  *   core:cleanupProcessed → unlink a tracked temp file
  *
  * One method per channel. Constructed once by coreSetup.js with the loaded
@@ -22,11 +22,12 @@ const fs = require('fs').promises;
 const path = require('path');
 const { senderOf, sendToRenderer } = require('../rendererMessaging');
 const { IpcChannels } = require('../ipcChannels');
+const { checkExportSource, checkExportDestination } = require('./exportPaths');
 
 const STATUS_CHANNEL = IpcChannels.CORE_STATUS;
 const ENGINE_UNAVAILABLE = 'ENGINE_UNAVAILABLE';
 
-/** `core:cleanupProcessed` and `core:export` take a bare path or `{ processedPath }`. */
+/** `core:cleanupProcessed` takes a bare path or `{ processedPath }`. */
 function processedPathOf(payload) {
   return typeof payload === 'string' ? payload : (payload && payload.processedPath) || null;
 }
@@ -160,36 +161,27 @@ class CoreIpcHandlers {
     }
   }
 
-  async export(event, payload) {
-    const processedPathStr =
-      typeof payload === 'string' ? payload : (payload && payload.processedPath) || null;
-    const destPath = (payload && payload.destPath) || null;
-
-    if (!processedPathStr) return { ok: false, error: 'No processed file path' };
+  async export(event, processedPath) {
+    // The source must be a temp file this app created; checked before any dialog opens.
+    const sourceError = await checkExportSource(this.tempFileManager, processedPath);
+    if (sourceError) return { ok: false, error: sourceError };
     const { sender } = senderOf(event);
 
     try {
-      let canceled = false;
-      let filePath;
-      if (destPath) {
-        filePath = destPath;
-      } else {
-        const result = await this.dialog.showSaveDialog({
-          title: 'Export processed file',
-          defaultPath: path.basename(processedPathStr),
-          filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
-        });
-        canceled = result.canceled;
-        filePath = result.filePath;
-      }
+      // The destination only ever comes from the save dialog, never the renderer.
+      const { canceled, filePath } = await this.dialog.showSaveDialog({
+        title: 'Export processed file',
+        defaultPath: path.basename(processedPath),
+        filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
+      });
+      if (canceled || !filePath) return { ok: false, error: 'Export canceled' };
 
-      if (canceled || !filePath) {
-        return { ok: false, error: 'Export canceled' };
-      }
+      const destinationError = checkExportDestination(this.tempFileManager, filePath);
+      if (destinationError) return { ok: false, error: destinationError };
 
-      await fs.copyFile(processedPathStr, filePath);
+      await fs.copyFile(processedPath, filePath);
 
-      await this.tempFileManager.cleanupTempFile(processedPathStr);
+      await this.tempFileManager.cleanupTempFile(processedPath);
 
       sendToRenderer(sender, STATUS_CHANNEL, {
         status: 'exported',

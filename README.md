@@ -28,7 +28,7 @@ There is no build for Intel Macs yet.
 ## Using Dissonance
 
 1. **Upload:** drop a WAV file on the window, or pick one from disk.
-2. **Analyze:** check the file's details, edit its tags, choose the protection strength, then **Process**.
+2. **Analyze:** check the file's details, edit its tags, choose the processing modes, then **Process**.
 3. **Compare:** listen to the original and the protected version side by side, then **Export** the protected file.
 
 Only WAV files are supported.
@@ -83,13 +83,25 @@ npm run watch:css
 ```bash
 npm run lint           # eslint
 npm run format:check   # prettier --check
-npm test               # vitest run (unit tests)
+npm test               # vitest run (unit tests + addon integration test)
 npm run build          # electron-builder --dir (unpacked .app for testing)
 ```
 
 All four are gated by CI on every push/PR.
 
 For an interactive test loop: `npm run test:watch`.
+
+### Test coverage
+
+```bash
+npm run test:coverage
+```
+
+Prints a per-file coverage table and writes a report to `coverage/` (git-ignored; open `coverage/index.html` for the browsable version). Every source file is counted, including files that no test imports, so the total reflects the real state of the project. The team target is 50% line coverage; it is not enforced yet. CI prints the total line coverage in the job summary.
+
+### Addon integration test
+
+`tests/coreAddon.integration.test.js` runs the real core addon from `Build/Release/` through the same `CoreAddonLoader` the app uses. It generates its own WAV fixtures, so no audio is committed. It checks that a processed file is a valid WAV with the same duration, sample rate and channels, and covers Beta 1 regressions (non-WAV input, truncated WAV, 0% strength). The 0% strength tests are marked `it.fails` until the addon is fixed (ui#83). On a platform with no matching addon binary the test is skipped with a warning.
 
 ---
 
@@ -98,7 +110,7 @@ For an interactive test loop: `npm run test:watch`.
 The app has three top-level views, navigated linearly:
 
 1. **Upload** — drop a WAV or pick one from disk
-2. **Analyze** — view file info, edit tag metadata, scrub the waveform, choose protection strength, hit Process
+2. **Analyze** — view file info, edit tag metadata, scrub the waveform, choose processing modes, hit Process
 3. **Compare** — side-by-side waveform + info for original vs processed, then Export
 
 ### Editable metadata
@@ -110,9 +122,9 @@ Seven WAV tag fields (title, artist, date, genre, comment, copyright, software) 
 - Switching files or quitting → flushes pending writes first (no edits ever lost)
 - Writes are serialised so the underlying read-modify-write can't be raced
 
-### Protection strength
+### Protection modes
 
-Single slider (0–1, step 0.01) on the Analyze view, forwarded to the core as `options.perturbation`. The CLI also accepts `--perturbation` for headless runs.
+Processing is mode-driven. Select one or more modes on the Analyze view, then press Process. The modes are White Noise, Phase Distortion, Spectral Gate, and Pink Noise. This build uses the project's validated default protection strength; a strength control will return once every mode is finalized.
 
 ### Waveform
 
@@ -185,4 +197,6 @@ Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag bu
 
 ## License
 
-MIT. See repository root.
+The Dissonance desktop app (this repository) is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The bundled audio engine addon (`Build/Release/*.node`, built from the closed-source `core` repository) is proprietary and is not covered by the Apache License 2.0.
