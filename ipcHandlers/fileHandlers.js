@@ -11,20 +11,35 @@
  *
  * registerWindowHandlers(win) runs for each new window:
  *   releaseCoreWindow   — drop the window's tag baselines once it is closed
+ *
+ * Both take optional doubles for tests; the defaults are the real modules.
  */
 const { UiLogForwarder } = require('./UiLogForwarder');
 const { FileDialogHandlers } = require('./FileDialogHandlers');
 const { registerThemeHandlers } = require('./themeHandlers');
-const { registerCoreHandlers, releaseCoreWindow } = require('./core/coreSetup');
+const coreSetup = require('./core/coreSetup');
 
-function registerFileHandlers() {
-  new UiLogForwarder().register();
-  new FileDialogHandlers().register();
-  registerThemeHandlers();
-  registerCoreHandlers();
+/**
+ * @param {object} [deps]
+ * @param {object} [deps.ipc]     defaults to Electron's ipcMain
+ * @param {object} [deps.dialog]  defaults to Electron's dialog
+ * @param {Function} [deps.registerTheme]
+ * @param {Function} [deps.registerCore]
+ */
+function registerFileHandlers({
+  ipc,
+  dialog,
+  registerTheme = registerThemeHandlers,
+  registerCore = coreSetup.registerCoreHandlers,
+} = {}) {
+  new UiLogForwarder({ ipc }).register();
+  new FileDialogHandlers({ ipc, dialog }).register();
+  registerTheme();
+  registerCore();
 }
 
-function registerWindowHandlers(win) {
+/** @param {{releaseCoreWindow?: Function}} [deps] */
+function registerWindowHandlers(win, { releaseCoreWindow = coreSetup.releaseCoreWindow } = {}) {
   const webContentsId = win.webContents.id;
   win.on('closed', () => releaseCoreWindow(webContentsId));
 }

@@ -96,14 +96,23 @@ export function makeUploadView() {
   return { callbacks, ...registrars, mount: vi.fn(), unmount: vi.fn() };
 }
 
-const SUBSCRIPTIONS = ['onAppFlushRequest', 'onPauseFileRequest', 'onTagsWrittenElsewhere'];
+const SUBSCRIPTIONS = [
+  'onAppFlushRequest',
+  'onPauseFileRequest',
+  'onTagsWrittenElsewhere',
+  'onSystemTheme',
+];
 
 /**
  * A `window.dissonance`-like bridge. Request methods are async spies with
  * happy-path answers (override per test); subscriptions store their
  * callback in `listeners` and return a spy kept in `unsubscribes`.
  */
-export function makeBridge({ processedPath = '/tmp/out.wav' } = {}) {
+export function makeBridge({
+  processedPath = '/tmp/out.wav',
+  themeMode = 'light',
+  isDevelopment = false,
+} = {}) {
   const listeners = {};
   const unsubscribes = {};
   const subscription = (name) =>
@@ -122,6 +131,9 @@ export function makeBridge({ processedPath = '/tmp/out.wav' } = {}) {
     writeTags: vi.fn(async () => ({ ok: true })),
     exportFile: vi.fn(async () => ({ ok: true, exportedPath: '/out/song.wav' })),
     cleanupProcessedFile: vi.fn(async () => {}),
+    getSystemTheme: vi.fn(async () => ({ mode: themeMode })),
+    logToMain: vi.fn(),
+    isDevelopment: vi.fn(() => isDevelopment),
     onCoreStatus: subscription('onCoreStatus'),
     ...Object.fromEntries(SUBSCRIPTIONS.map((name) => [name, subscription(name)])),
   };
@@ -199,4 +211,27 @@ export function makeTagSession() {
     flush: vi.fn(async () => {}),
     pauseAndFlush: vi.fn(async () => {}),
   };
+}
+
+/**
+ * A `document`-like double: getElementById() hands back one makeElement()
+ * per id (the same one on every call), querySelectorAll() an empty list,
+ * and documentElement has a classList whose toggle() is a spy.
+ */
+export function makeDocument() {
+  const elements = new Map();
+  return {
+    elements,
+    getElementById: vi.fn((id) => {
+      if (!elements.has(id)) elements.set(id, makeElement());
+      return elements.get(id);
+    }),
+    querySelectorAll: vi.fn(() => []),
+    documentElement: { classList: { toggle: vi.fn(), contains: () => false } },
+  };
+}
+
+/** A `window`-like event target that also records dispatchEvent() calls. */
+export function makeWindow(bridge) {
+  return Object.assign(makeEventTarget(), { dissonance: bridge, dispatchEvent: vi.fn() });
 }
