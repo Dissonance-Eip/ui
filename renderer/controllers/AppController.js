@@ -14,6 +14,8 @@
  *   • restart (always-visible button, any screen) → flush + reset to upload,
  *     discarding any in-flight processing result via the operation id
  *   • quit/close flush request → pause, snapshot form, drain (preload answers main)
+ *   • a tag snapshot is only saved once the form holds the file's tags, or
+ *     after the user changed a field (see _formTagsToSave)
  *   • another window about to rewrite the shown file → pause its players
  *   • another window rewrote the shown file → save own edits, re-read tags,
  *     reload the players (the audio data may have moved in the file)
@@ -27,6 +29,8 @@
  */
 import { BaseController } from '../base/BaseController.js';
 import { TagWriteQueue } from '../services/TagWriteQueue.js';
+
+const asText = (value) => (value == null ? '' : String(value));
 
 export class AppController extends BaseController {
   constructor({
@@ -63,6 +67,16 @@ export class AppController extends BaseController {
     // call itself isn't cancelled — there's no cancellation IPC — this just
     // makes the renderer ignore the stale result when it eventually arrives.
     this._activeOperationId = 0;
+
+    // Bumped on every metadata read; a reply whose id no longer matches (the
+    // user imported another file meanwhile) is dropped instead of filling
+    // the form with the wrong file's tags.
+    this._metadataReadId = 0;
+
+    // What the controller last put into the tag form:
+    //   { filePath, loaded, tags } — loaded is true once the file's own tags
+    //   were read into it. null when no file is shown.
+    this._formFill = null;
 
     // Serialised, blockable queue for auto-saving tag edits. Blocked while
     // the audio element is streaming a file; flushed on quit.
@@ -115,7 +129,8 @@ export class AppController extends BaseController {
     // serialises writes so concurrent calls can't corrupt the file.
     this.analyzeView.onTagBlur((tags) => {
       const filePath = this.state.currentFilePath;
-      if (filePath) this._tagQueue.enqueue(filePath, tags);
+      const toSave = this._tagsToSave(filePath, tags);
+      if (toSave) this._tagQueue.enqueue(filePath, toSave);
     });
 
     // Block the queue while audio is playing, unblock on pause/end so any
@@ -180,6 +195,7 @@ export class AppController extends BaseController {
     this.state.setCurrentFilePath(filePath);
     this._originalBasicInfo = this.wavMetadataService.toBasicInfo(filePath, null);
     this._processedBasicInfo = null;
+    this._formFill = Object.freeze({ filePath, loaded: false, tags: this._originalBasicInfo.tags });
 
     this.compareView.clearAudioPreviews?.();
 
@@ -199,20 +215,35 @@ export class AppController extends BaseController {
 
   async _readFileMetadata(filePath) {
     if (!filePath) return;
+    const readId = ++this._metadataReadId;
     try {
       this.logger?.setStatus?.('Reading metadata…');
       const resp = await this.api.readFileMetadata(filePath);
+      if (!this._isCurrentRead(readId, filePath)) {
+        this.logger?.log?.(`Ignoring metadata for ${filePath} — another file is shown now`);
+        return;
+      }
       if (resp && resp.ok && resp.audio) {
         this._originalBasicInfo = this.wavMetadataService.toBasicInfoFromMetadata(filePath, resp);
         this.analyzeView.setBasicWavInfo(this._originalBasicInfo);
+        this._formFill = Object.freeze({
+          filePath,
+          loaded: true,
+          tags: this._originalBasicInfo.tags,
+        });
         this.logger?.setStatus?.('Ready');
         return;
       }
       const errMsg = resp && resp.error ? resp.error : 'Unknown error';
       this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
     } catch (err) {
+      if (!this._isCurrentRead(readId, filePath)) return;
       this.logger?.error?.(`Metadata failed: ${err}`);
     }
+  }
+
+  _isCurrentRead(readId, filePath) {
+    return readId === this._metadataReadId && filePath === this.state.currentFilePath;
   }
 
   async processCurrentFile() {
@@ -265,8 +296,8 @@ export class AppController extends BaseController {
 
       if (resp && resp.ok && resp.processedPath) {
         // Write the user's edited metadata tags into the processed file.
-        const editedTags = this.analyzeView.getMetadataTags?.() ?? {};
-        this._tagQueue.enqueue(resp.processedPath, editedTags);
+        const editedTags = this._formTagsToSave();
+        if (editedTags) this._tagQueue.enqueue(resp.processedPath, editedTags);
         await this._tagQueue.flush();
 
         this.state.setProcessedFilePath(resp.processedPath);
@@ -366,7 +397,8 @@ export class AppController extends BaseController {
    *   2. Snapshot the current form into the queue for the current file path
    *      so any tag edit that didn't fire blur (native dialog stealing focus,
    *      Cmd+Q with focus in an input, clicking Process from an input, etc.)
-   *      is captured.
+   *      is captured — unless the form is still empty because the file's
+   *      tags never loaded and the user typed nothing (#111).
    *   3. Await the queue draining all pending + in-flight writes.
    *
    * Called from importFile, processCurrentFile, and the quit flush handler.
@@ -374,11 +406,36 @@ export class AppController extends BaseController {
   async _pauseAndFlushTags() {
     this._pauseAllPreviews();
 
-    if (this.state.currentFilePath) {
-      this._tagQueue.enqueue(this.state.currentFilePath, this.analyzeView.getMetadataTags());
-    }
+    const tags = this._formTagsToSave();
+    if (tags) this._tagQueue.enqueue(this.state.currentFilePath, tags);
 
     await this._tagQueue.flush();
+  }
+
+  /** @returns {object|null} what to save from the form for the current file, or null for nothing */
+  _formTagsToSave() {
+    const filePath = this.state.currentFilePath;
+    if (!filePath) return null;
+    return this._tagsToSave(filePath, this.analyzeView.getMetadataTags());
+  }
+
+  /**
+   * Once the form holds `filePath`'s own tags, the whole snapshot is saved
+   * (main writes only what differs from what this window read). Before that
+   * — read pending or failed — the form is an empty placeholder: only the
+   * fields the user actually changed are saved, so the empty ones can never
+   * wipe the file's tags. Nothing changed → null, no write.
+   * @returns {object|null}
+   */
+  _tagsToSave(filePath, tags) {
+    if (!filePath) return null;
+    const fill = this._formFill && this._formFill.filePath === filePath ? this._formFill : null;
+    if (fill && fill.loaded) return tags;
+    const shown = fill ? fill.tags : {};
+    const edited = Object.entries(tags || {}).filter(
+      ([name, value]) => asText(value) !== asText(shown[name])
+    );
+    return edited.length > 0 ? Object.fromEntries(edited) : null;
   }
 
   /** Pause every audio preview in this window (analyze + both compare players). */
@@ -437,6 +494,7 @@ export class AppController extends BaseController {
   _resetToUpload() {
     this._pauseAllPreviews();
     this.state.setCurrentFilePath(null);
+    this._formFill = null;
     this._originalBasicInfo = null;
     this._processedBasicInfo = null;
     this.analyzeView.setSelectedFile(null);

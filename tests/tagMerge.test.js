@@ -18,10 +18,15 @@ describe('diffTags', () => {
     expect(diffTags({ title: undefined }, { title: '' })).toEqual({});
   });
 
-  it('reports every field when the window never read the file', () => {
-    const next = { title: 'A', artist: '' };
+  it('reports only filled fields when the window never read the file (#111)', () => {
+    // With no baseline an empty field means "never loaded", not "cleared".
+    const next = { title: 'A', artist: '', genre: '  ' };
 
-    expect(diffTags(null, next)).toEqual({ title: 'A', artist: '' });
+    expect(diffTags(null, next)).toEqual({ title: 'A' });
+  });
+
+  it('reports nothing for an empty form the window never read (#111)', () => {
+    expect(diffTags(undefined, { title: '', artist: '' })).toEqual({});
   });
 
   it('does not modify its inputs', () => {

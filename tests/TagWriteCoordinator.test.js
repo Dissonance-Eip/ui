@@ -84,12 +84,37 @@ describe('TagWriteCoordinator — edits from two windows on one file', () => {
     expect(notifier.beforeWrite).not.toHaveBeenCalled();
   });
 
-  it('writes the full set when the window never read the file (fresh processed output)', async () => {
-    const { coordinator, coreAddon } = makeCoordinator(makeCoreAddon({ '/tmp/out.wav': {} }));
+  it('writes only the filled fields when the window never read the file (#111)', async () => {
+    const { coordinator, coreAddon } = makeCoordinator(
+      makeCoreAddon({ '/tmp/out.wav': { artist: 'Kept' } })
+    );
 
     await coordinator.writeTags(WINDOW_A, '/tmp/out.wav', { title: 'T', artist: '' });
 
-    expect(coreAddon.files.get('/tmp/out.wav')).toEqual({ title: 'T', artist: '' });
+    expect(coreAddon.files.get('/tmp/out.wav')).toEqual({ title: 'T', artist: 'Kept' });
+  });
+
+  it('never writes an empty form for a file the window never read (#111)', async () => {
+    const { coordinator, coreAddon } = makeCoordinator();
+
+    const result = await coordinator.writeTags(WINDOW_A, SONG, {
+      title: '',
+      artist: '',
+      genre: '',
+    });
+
+    expect(result).toEqual({ ok: true, skipped: true });
+    expect(coreAddon.writeTags).not.toHaveBeenCalled();
+    expect(coreAddon.files.get(SONG)).toEqual(ORIGINAL_TAGS);
+  });
+
+  it('sends no empty field when unread and the current tags cannot be read (#111)', async () => {
+    const { coordinator, coreAddon } = makeCoordinator();
+    coreAddon.readMetadata.mockResolvedValueOnce({ ok: false, error: 'busy' });
+
+    await coordinator.writeTags(WINDOW_A, SONG, { title: 'New', artist: '', genre: '' });
+
+    expect(coreAddon.writeTags).toHaveBeenCalledWith(SONG, { title: 'New' });
   });
 
   it('never runs two writes on the same file at once', async () => {
