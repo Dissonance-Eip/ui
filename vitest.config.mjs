@@ -13,7 +13,8 @@ export default defineConfig({
     coverage: {
       // Listing the source globs in `include` makes untested files count as 0%.
       provider: 'v8',
-      reporter: ['text', 'json-summary', 'html'],
+      // lcov writes coverage/lcov.info for SonarQube Cloud (docs#78).
+      reporter: ['text', 'json-summary', 'html', 'lcov'],
       reportsDirectory: 'coverage',
       include: ['main.js', 'preload.js', 'main/**/*.js', 'ipcHandlers/**/*.js', 'renderer/**/*.js'],
       exclude: ['tests/**', 'node_modules/**', 'coverage/**', 'dist/**', 'Build/**'],

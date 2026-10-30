@@ -24,10 +24,19 @@ jobs:
   quality-checks:
     name: Lint, Format, Test, Build
     runs-on: ubuntu-latest
+    # SonarQube Cloud (docs#78) reuses the coverage report below. The scan is
+    # skipped until the SONAR_TOKEN secret exists. It runs on pull requests and
+    # on pushes to dev (the Sonar main branch): the free plan analyses nothing else.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_name == 'dev')) }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Sonar needs history for blame and new-code detection.
+          fetch-depth: ${{ secrets.SONAR_TOKEN != '' && '0' || '1' }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -68,6 +77,10 @@ jobs:
           echo "### Test coverage" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Total line coverage: **${LINES}%** (team target: 50%, not enforced yet)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SonarQube Cloud scan
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
 
       - name: Run build check
         run: npm run build
