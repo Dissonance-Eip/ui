@@ -6,6 +6,7 @@
  *   ensureRootDir()            – create the temp root on demand
  *   registerForSender(id,path) – remember a file so we can clean it later
  *   cleanupForSender(id)       – unlink the file associated with a renderer
+ *   isTracked(path)            – true only for a path this manager registered
  *   cleanupTempFile(path)      – unlink a single tracked-or-under-root file
  *   cleanupAll()               – unlink everything we registered (called on quit)
  *
@@ -55,6 +56,16 @@ class TempFileManager {
     if (p) {
       await this.cleanupTempFile(p);
     }
+  }
+
+  /**
+   * True only for a path registered here, compared exactly as it was
+   * registered: an untracked file under the root or a `..` spelling of a
+   * tracked one doesn't count. Gate anything that reads a renderer-named
+   * temp file (core:export) on this, not on isUnderRoot().
+   */
+  isTracked(filePath) {
+    return typeof filePath === 'string' && this.tempFiles.has(filePath);
   }
 
   isUnderRoot(filePath) {
