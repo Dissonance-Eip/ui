@@ -59,4 +59,9 @@ export class DissonanceApi extends BaseApi {
   onTagsWrittenElsewhere(cb) {
     return this._call('onTagsWrittenElsewhere', cb);
   }
+
+  /** True only in an unpacked development build. */
+  isDevelopment() {
+    return this._call('isDevelopment') === true;
+  }
 }

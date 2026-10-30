@@ -8,18 +8,38 @@ import { vi } from 'vitest';
  */
 let nextWebContentsId = 1;
 
+/**
+ * A webContents-like emitter. `emit('will-navigate', event)` fakes a
+ * navigation; `windowOpenHandler` holds what setWindowOpenHandler() received.
+ */
 export function makeWebContents({ destroyed = false } = {}) {
-  return {
+  const webContents = new EventEmitter();
+  return Object.assign(webContents, {
     id: nextWebContentsId++,
     send: vi.fn(),
     isDestroyed: () => destroyed,
-  };
+    windowOpenHandler: null,
+    setWindowOpenHandler: (handler) => {
+      webContents.windowOpenHandler = handler;
+    },
+  });
 }
 
 /** An ipcMain-like emitter: `emitFrom(sender, channel, payload)` fakes a renderer message. */
 export function makeIpc() {
   const ipc = new EventEmitter();
   ipc.emitFrom = (sender, channel, payload) => ipc.emit(channel, { sender }, payload);
+  return ipc;
+}
+
+/** ipcMain double that also records invoke handlers like ipcMain.handle(). */
+export function makeHandlingIpc() {
+  const ipc = makeIpc();
+  ipc.handlers = new Map();
+  ipc.handle = vi.fn((channel, handler) => {
+    if (ipc.handlers.has(channel)) throw new Error(`second handler for ${channel}`);
+    ipc.handlers.set(channel, handler);
+  });
   return ipc;
 }
 

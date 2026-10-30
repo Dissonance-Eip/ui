@@ -1,6 +1,6 @@
 /**
  * Singleton wiring for the core addon side of the app.
- * Loads the native addon, creates the shared TempFileManager, the per-file
+ * Loads the native addon (or keeps why it couldn't), creates the shared TempFileManager, the per-file
  * lock and the TagWriteCoordinator, and constructs the CoreIpcHandlers
  * instance — all at module-load time.
  * Exposes `registerCoreHandlers()` (once per app, shared by every window),
@@ -16,7 +16,7 @@ const { TagWriteCoordinator } = require('./TagWriteCoordinator');
 const { createOtherWindowsNotifier } = require('./OtherWindowsNotifier');
 
 const tempFileManager = new TempFileManager();
-const coreAddon = new CoreAddonLoader().load();
+const { addon: coreAddon, error: coreLoadError } = new CoreAddonLoader().load();
 const fileLock = new FileLock();
 const tagWriteCoordinator = new TagWriteCoordinator({
   coreAddon,
@@ -28,6 +28,7 @@ const tagWriteCoordinator = new TagWriteCoordinator({
 });
 const coreIpcHandlers = new CoreIpcHandlers({
   coreAddon,
+  coreLoadError,
   tempFileManager,
   fileLock,
   tagWriteCoordinator,
