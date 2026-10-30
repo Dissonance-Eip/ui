@@ -60,7 +60,10 @@ class TagWriteCoordinator {
     if (!changes) return { ok: true, skipped: true };
 
     await this.notifier.beforeWrite(senderId, filePath);
-    const currentTags = await this._readCurrentTags(filePath, tags);
+    const currentTags = await this._readCurrentTags(
+      filePath,
+      this._baselineFor(senderId, filePath)
+    );
     const result = await this.coreAddon.writeTags(filePath, { ...currentTags, ...changes });
 
     if (result && result.ok) {
@@ -72,13 +75,20 @@ class TagWriteCoordinator {
 
   /** @returns {object|null} the changed fields, or null when there is nothing to write */
   _changesFor(senderId, filePath, tags) {
-    const baseline = (this._baselines.get(senderId) || {})[filePath];
-    const changes = diffTags(baseline, tags);
+    const changes = diffTags(this._baselineFor(senderId, filePath), tags);
     return hasTagChanges(changes) ? changes : null;
   }
 
-  /** The file's tags right now; falls back to the window's own snapshot if unreadable. */
-  async _readCurrentTags(filePath, fallbackTags) {
+  /** @returns {object|undefined} the tags this window last read or wrote for filePath */
+  _baselineFor(senderId, filePath) {
+    return (this._baselines.get(senderId) || {})[filePath];
+  }
+
+  /**
+   * The file's tags right now. If unreadable, falls back to what the window
+   * last saw — or nothing, so a never-read form can't send empty fields.
+   */
+  async _readCurrentTags(filePath, fallbackTags = {}) {
     try {
       const resp = await this.coreAddon.readMetadata(filePath);
       return resp && resp.ok && resp.tags ? resp.tags : fallbackTags;

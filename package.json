@@ -23,14 +23,16 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check .",
+    "prepare": "husky",
     "build": "electron-builder --dir",
     "predist": "npm run build:css",
     "dist": "electron-builder --publish never",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "build": {
     "appId": "com.dissonanceeip.dissonance",
     "productName": "Dissonance",
@@ -65,15 +67,25 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/cli": "^4.3.3",
+    "@vitest/coverage-v8": "^4.1.12",
     "check-peer-dependencies": "^5.0.0",
     "depcheck": "^1.4.7",
     "electron": "^44.7.0",
     "electron-builder": "^26.15.3",
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "npm-check-updates": "^23.1.0",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "vitest": "^4.1.7"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write --ignore-unknown"
+    ],
+    "!(*.{js,mjs,cjs})": "prettier --write --ignore-unknown"
   }
 }

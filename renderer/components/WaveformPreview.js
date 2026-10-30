@@ -1,4 +1,9 @@
 import { BaseComponent } from '../base/BaseComponent.js';
+import { DARK_MODE, LIGHT_MODE, getWaveformColors } from '../utils/waveformColors.js';
+import { toFileUrl } from '../utils/fileUrl.js';
+
+// Tailwind's dark-mode class, toggled on <html> by SystemThemeWatcher.
+const DARK_THEME_CLASS = 'dark';
 
 /**
  * Reusable waveform preview built on the third-party WaveformPlayer.
@@ -6,8 +11,9 @@ import { BaseComponent } from '../base/BaseComponent.js';
  * Encapsulates:
  *   - Player create / loadTrack / destroy lifecycle
  *   - Suppression of WaveformPlayer's unconditional auto-play in loadTrack()
- *   - file:// URL conversion for absolute paths
- *   - Theme rebuild on `dissonance:theme` event
+ *   - file:// URL conversion for absolute paths (via utils/fileUrl.js)
+ *   - In-place theme repaint on `dissonance:theme` event (the player and
+ *     its audio element are kept, so playback is never interrupted)
  *   - Audio play/pause/ended event forwarding via onPlaybackStateChange
  *
  * Used by AnalyzeView (one instance) and CompareView (two instances).
@@ -54,7 +60,7 @@ export class WaveformPreview extends BaseComponent {
     }
     this._currentFilePath = filePath;
 
-    const url = WaveformPreview._toFileUrl(filePath);
+    const url = toFileUrl(filePath);
     if (!url) {
       this.clear();
       return;
@@ -91,13 +97,12 @@ export class WaveformPreview extends BaseComponent {
       showBPM: false,
       showPlaybackSpeed: false,
       showHoverTime: true,
-      ...WaveformPreview._getWaveformColors(),
+      ...getWaveformColors(this._themeMode ?? WaveformPreview._readDocumentThemeMode()),
     });
 
-    // (Re)wire audio event listeners to the new audio element. The same
-    // element is reused across loadTrack() calls, so we only need to do this
-    // once per fresh player — but crucially we DO need to do it after every
-    // theme rebuild (which creates a brand-new player).
+    // Wire audio event listeners to the new audio element. The same element
+    // is reused across loadTrack() calls and theme changes, so this is only
+    // needed once per fresh player.
     this._attachAudioListeners();
 
     // The library only ships click-to-seek; add drag-to-scrub on top so
@@ -219,76 +224,35 @@ export class WaveformPreview extends BaseComponent {
 
   _onThemeChanged(e) {
     const mode = e?.detail?.mode ? String(e.detail.mode) : null;
-    if (mode && mode === this._themeMode) return;
+    if (!mode || mode === this._themeMode) return;
     this._themeMode = mode;
-
-    if (!this._player || !this._currentFilePath) return;
-
-    // Capture playback state before tearing the player down so we can
-    // restore position + play state on the new player. Otherwise the user
-    // changes theme mid-listen and silently loses their place.
-    const wasPlaying = this.isPlaying;
-    const currentTime = this._player.audio?.currentTime ?? 0;
-
-    // Recreate the player so the new theme colours take effect.
-    // setFile() also re-attaches audio listeners to the new player's audio.
-    const filePath = this._currentFilePath;
-    this.clear();
-    this.setFile(filePath);
-
-    if (!this._player?.audio) return;
-    this._restorePlaybackState(currentTime, wasPlaying);
+    this._repaintPlayer(getWaveformColors(mode));
   }
 
   /**
-   * After a player rebuild, seek to the previous position and resume if it
-   * was playing. The audio element loads asynchronously so we wait for
-   * `loadedmetadata` (duration is known by then) before seeking.
+   * Apply new colours to the live player and redraw its canvas. Rebuilding
+   * the player instead would create a new audio element and re-decode the
+   * whole file — a visible freeze, and playback restarting.
    */
-  _restorePlaybackState(currentTime, wasPlaying) {
-    const audio = this._player?.audio;
-    if (!audio) return;
-
-    const restore = () => {
-      audio.removeEventListener('loadedmetadata', restore);
-      try {
-        if (currentTime > 0 && Number.isFinite(audio.duration)) {
-          audio.currentTime = Math.min(currentTime, audio.duration);
-        }
-        if (wasPlaying) audio.play?.().catch(() => {});
-      } catch (_e) {
-        // ignore — best-effort restore
-      }
-    };
-
-    if (audio.readyState >= 1 /* HAVE_METADATA */) {
-      restore();
-    } else {
-      audio.addEventListener('loadedmetadata', restore);
-    }
-  }
-
-  static _toFileUrl(filePath) {
+  _repaintPlayer(colors) {
+    const player = this._player;
+    if (!player) return;
     try {
-      return new URL(`file://${filePath}`).toString();
+      player.options = { ...player.options, ...colors };
+      const buttonStyle = player.playBtn?.style;
+      if (buttonStyle) {
+        buttonStyle.borderColor = colors.buttonColor;
+        buttonStyle.color = colors.buttonColor;
+      }
+      player.drawWaveform?.();
     } catch (_e) {
-      return null;
+      // ignore — cosmetic only
     }
   }
 
-  static _getWaveformColors() {
-    const isDark = !!document?.documentElement?.classList?.contains('dark');
-    if (isDark) {
-      return {
-        waveformColor: 'rgba(226, 232, 240, 0.30)',
-        progressColor: 'rgba(226, 232, 240, 0.95)',
-        buttonColor: 'rgba(226, 232, 240, 0.95)',
-      };
-    }
-    return {
-      waveformColor: 'rgba(15, 23, 42, 0.25)',
-      progressColor: 'rgba(15, 23, 42, 0.9)',
-      buttonColor: 'rgba(15, 23, 42, 0.9)',
-    };
+  /** Fallback for a player created before the first theme event arrived. */
+  static _readDocumentThemeMode() {
+    const isDark = !!globalThis.document?.documentElement?.classList?.contains(DARK_THEME_CLASS);
+    return isDark ? DARK_MODE : LIGHT_MODE;
   }
 }

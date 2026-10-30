@@ -72,8 +72,6 @@ export function bootstrap() {
     tagCommentEl: document.getElementById('metaTagComment'),
     tagCopyrightEl: document.getElementById('metaTagCopyright'),
     tagSoftwareEl: document.getElementById('metaTagSoftware'),
-    protectionStrengthEl: document.getElementById('protectionStrength'),
-    protectionStrengthValueEl: document.getElementById('protectionStrengthValue'),
     processingModeEls: document.querySelectorAll('[data-processing-mode]'),
     processingModeLabelEl: document.getElementById('processingModesLabel'),
     processBtn: document.getElementById('processBtn'),

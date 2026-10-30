@@ -29,11 +29,11 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `AppController.js` — top-level orchestration: the three-view flow, the TagWriteQueue, the playback↔queue coordination, the quit-flush handler.
 - `renderer/views/`
   - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
-  - `AnalyzeView.js` — file info + waveform + editable metadata + protection slider + process button.
+  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button.
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
 - `renderer/components/`
   - `DropZone.js` — drag/drop + click-to-open file picker. Falls back to the native dialog when a dropped file has no resolvable path.
-  - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, theme rebuild (preserves playback position), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
+  - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, in-place theme repaint (keeps the player and its audio, so playback continues), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
 - `renderer/services/`
   - `TagWriteQueue.js` — serialised, blockable queue for writing WAV tag metadata. Per-snapshot filePath, flush-on-quit, error recovery.
   - `WavMetadataService.js` — converts `core:readMetadata` responses into the display-friendly basicInfo shape.
@@ -68,8 +68,8 @@ The Analyze view and the Compare view both display waveforms via the `WaveformPr
 
 - Player create / `loadTrack` / destroy lifecycle.
 - Suppression of `WaveformPlayer.loadTrack()`'s unconditional auto-play (it replaces `.play` with a no-op for the duration of the call, then restores).
-- `file://` URL conversion for absolute paths.
-- Theme rebuild on `dissonance:theme`. Captures `currentTime` + `isPlaying` before tearing down the player, restores them after the new player's audio fires `loadedmetadata`.
+- `file://` URL conversion for absolute paths via `renderer/utils/fileUrl.js`, which percent-encodes each path segment so names with `#`, `?`, `%`, spaces or non-ASCII characters load correctly (POSIX, Windows drive and UNC paths).
+- In-place theme repaint on `dissonance:theme`: the new colours (`renderer/utils/waveformColors.js`) are applied to the live player and its canvas is redrawn. The player and its audio element are kept, so playback never pauses, restarts or reloads the file.
 - Hold-and-drag scrubbing via pointer events on the canvas (the library only ships click-to-seek).
 - Audio `play` / `pause` / `ended` event forwarding via `onPlaybackStateChange`, used by `AppController` to toggle the TagWriteQueue's blocked state.
 

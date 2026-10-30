@@ -58,8 +58,16 @@ jobs:
             npm run format -- --check
           fi
 
-      - name: Run unit tests
+      - name: Run unit and addon integration tests
         run: npm test
+
+      - name: Report test coverage
+        run: |
+          npm run test:coverage
+          LINES=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct)")
+          echo "### Test coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Total line coverage: **${LINES}%** (team target: 50%, not enforced yet)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run build check
         run: npm run build
