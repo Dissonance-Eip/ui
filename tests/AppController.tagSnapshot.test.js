@@ -41,8 +41,8 @@ function makeAnalyzeView() {
     setAudioPreviewFile: vi.fn(),
     setProcessEnabled: vi.fn(),
     pauseAudioPreview: vi.fn(),
-    getProcessingModes: vi.fn(() => []),
-    getProtectionStrength: vi.fn(() => 0.5),
+    // Process needs at least one mode since the strength slider was removed (#104).
+    getProcessingModes: vi.fn(() => ['white_noise']),
   };
 }
 
