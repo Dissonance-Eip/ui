@@ -13,6 +13,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { logger: mainLogger } = require('../../main/logger');
 
 const ADDON_NAME = 'dissonance_core';
 const OVERRIDE_ENV_VAR = 'DISSONANCE_CORE_ADDON_PATH';
@@ -46,7 +47,7 @@ class CoreAddonLoader {
     arch = process.arch,
     existsSync = fs.existsSync,
     requireFn = require,
-    logger = console,
+    logger = mainLogger,
   } = {}) {
     this.deps = { uiRoot, env, platform, arch, existsSync, requireFn, logger };
   }
@@ -99,7 +100,8 @@ class CoreAddonLoader {
   _exists(filePath) {
     try {
       return this.deps.existsSync(filePath);
-    } catch (_e) {
+    } catch (e) {
+      this.deps.logger.warn(`Could not check ${filePath}`, e);
       return false;
     }
   }

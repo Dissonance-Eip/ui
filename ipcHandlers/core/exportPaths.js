@@ -14,6 +14,7 @@
  */
 const fs = require('fs').promises;
 const path = require('path');
+const { logger } = require('../../main/logger');
 
 const INVALID_SOURCE = 'Not a processed file';
 const INVALID_DESTINATION = 'Invalid export destination';
@@ -31,7 +32,8 @@ async function checkExportSource(tempFileManager, processedPath) {
     // lstat doesn't follow symlinks, so a tracked path replaced by a link fails here.
     const stats = await fs.lstat(processedPath);
     return stats.isFile() ? null : INVALID_SOURCE;
-  } catch (_err) {
+  } catch (err) {
+    logger.warn('Export source is not readable', err);
     return INVALID_SOURCE;
   }
 }

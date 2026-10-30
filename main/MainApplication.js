@@ -15,6 +15,7 @@ const { app, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+const { logger } = require('./logger');
 const { MainWindowManager } = require('./MainWindowManager');
 const { routeLaunchesToFirstInstance } = require('./singleInstance');
 const { flushWindow, flushWindows, attachCloseFlush } = require('./windowFlush');
@@ -102,8 +103,8 @@ class MainApplication {
     if (!fs.existsSync(this.iconPath)) return;
     try {
       app.dock.setIcon(this.iconPath);
-    } catch (_e) {
-      // ignore — cosmetic only
+    } catch (e) {
+      logger.warn('Could not set the Dock icon', e);
     }
   }
 
@@ -120,7 +121,7 @@ class MainApplication {
     });
 
     win.loadFile(this.indexPath).catch((e) => {
-      console.error('Failed to load index.html:', e);
+      logger.error('Failed to load index.html:', e);
     });
     registerWindowHandlers(win);
 

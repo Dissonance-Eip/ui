@@ -90,6 +90,25 @@ describe('core:export source', () => {
     );
   });
 
+  it('still reports success when the temp file cannot be deleted afterwards', async () => {
+    const { tempFileManager, sender, exportFile, savePath } = setup();
+    const processedPath = await makeTrackedTempFile(tempFileManager, sender.id);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(fs, 'unlink').mockRejectedValueOnce(
+      Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
+    );
+
+    const result = await exportFile(processedPath);
+
+    expect(result).toEqual({ ok: true, exportedPath: savePath });
+    expect(await fs.readFile(savePath, 'utf8')).toBe(PROCESSED_AUDIO);
+    expect(tempFileManager.isTracked(processedPath)).toBe(true);
+    expect(console.error).toHaveBeenCalledWith(
+      'Could not delete a processed temp file',
+      expect.objectContaining({ code: 'EPERM' })
+    );
+  });
+
   it('rejects a file the app never created', async () => {
     const { dialog, exportFile, savePath } = setup();
 

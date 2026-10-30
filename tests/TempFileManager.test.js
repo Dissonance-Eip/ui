@@ -182,7 +182,24 @@ describe('TempFileManager.cleanupTempFile — root checks', () => {
 
     await expect(manager.cleanupTempFile('')).resolves.toBeUndefined();
   });
+
+  it.each(['EPERM', 'EBUSY'])('throws %s and keeps the file tracked', async (code) => {
+    const manager = new TempFileManager({ rootDir });
+    const output = await makeRegisteredOutput(manager, WINDOW_A);
+    vi.spyOn(fs, 'unlink').mockRejectedValueOnce(unlinkError(code));
+
+    await expect(manager.cleanupTempFile(output)).rejects.toMatchObject({ code });
+    expect(manager.isTracked(output)).toBe(true);
+  });
 });
+
+function unlinkError(code) {
+  return Object.assign(new Error(`${code}: cannot unlink`), { code });
+}
+
+function makeLogger() {
+  return { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
+}
 
 describe('TempFileManager — per-window files', () => {
   it('cleaning up one window removes only that window’s output', async () => {
@@ -252,6 +269,27 @@ describe('TempFileManager.cleanupAll', () => {
     await manager.cleanupForSender(WINDOW_A);
 
     expect(await exists(output)).toBe(true);
+  });
+
+  it('logs a file it cannot delete, still deletes the rest and forgets them all', async () => {
+    const logger = makeLogger();
+    const manager = new TempFileManager({ rootDir, logger });
+    const locked = await makeRegisteredOutput(manager, WINDOW_A);
+    const other = await makeRegisteredOutput(manager, WINDOW_B, '/music/other.wav');
+    const realUnlink = fs.unlink;
+    vi.spyOn(fs, 'unlink').mockImplementation((p) =>
+      p === locked ? Promise.reject(unlinkError('EBUSY')) : realUnlink(p)
+    );
+
+    await expect(manager.cleanupAll()).resolves.toBeUndefined();
+
+    expect(await exists(other)).toBe(false);
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith(
+      `Could not delete temp file ${locked}`,
+      expect.objectContaining({ code: 'EBUSY' })
+    );
+    expect(manager.isTracked(locked)).toBe(false);
   });
 
   it('still finishes when a registered file is already gone', async () => {

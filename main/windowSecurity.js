@@ -13,6 +13,7 @@
  * a navigation, so it is unaffected; the CSP in index.html governs it.
  */
 const { URL } = require('url');
+const { logger } = require('./logger');
 
 /** Renderer argv flag meaning "development build": preload reads it. */
 const DEV_MODE_ARG = '--dissonance-dev';
@@ -38,7 +39,8 @@ function secureWebPreferences({ preloadPath, isDevelopment }) {
 function parseUrl(url) {
   try {
     return new URL(url);
-  } catch (_e) {
+  } catch (e) {
+    logger.warn('Ignoring a URL that does not parse', e);
     return null;
   }
 }
@@ -67,7 +69,7 @@ function hardenNavigation(win, { appUrl, openExternal }) {
   const sendToSystemBrowser = (url) => {
     if (!isExternalWebUrl(url)) return;
     Promise.resolve(openExternal(url)).catch((e) => {
-      console.error('Failed to open link in the system browser:', e);
+      logger.error('Failed to open link in the system browser:', e);
     });
   };
 

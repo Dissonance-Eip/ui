@@ -69,6 +69,6 @@ describe('UiLogForwarder', () => {
     };
 
     expect(() => send({ message: unprintable })).not.toThrow();
-    expect(spies.log).toHaveBeenCalledWith('[UI] (log forwarding failed)', expect.any(Error));
+    expect(spies.error).toHaveBeenCalledWith('[UI] (log forwarding failed)', expect.any(Error));
   });
 });

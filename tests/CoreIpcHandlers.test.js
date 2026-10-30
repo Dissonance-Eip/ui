@@ -33,9 +33,12 @@ function makeAddon() {
   };
 }
 
+const busyError = () => Object.assign(new Error('EBUSY: resource busy'), { code: 'EBUSY' });
+
 function setup({ coreAddon = makeAddon(), coreLoadError = null } = {}) {
   const ipc = makeHandlingIpc();
   const tempFileManager = makeTempFileManager();
+  const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const tagWriteCoordinator = makeTagWriteCoordinator();
   new CoreIpcHandlers({
     coreAddon,
@@ -44,10 +47,11 @@ function setup({ coreAddon = makeAddon(), coreLoadError = null } = {}) {
     fileLock: new FileLock(),
     tagWriteCoordinator,
     ipc,
+    logger,
   }).register();
   const sender = makeWebContents();
   const invoke = (channel, payload) => ipc.handlers.get(channel)({ sender }, payload);
-  return { ipc, invoke, sender, coreAddon, tempFileManager, tagWriteCoordinator };
+  return { ipc, invoke, sender, coreAddon, tempFileManager, tagWriteCoordinator, logger };
 }
 
 const statusesSentTo = (sender) =>
@@ -87,6 +91,31 @@ describe('CoreIpcHandlers — core:cleanupProcessed', () => {
       ok: false,
       error: 'No processed file path',
     });
+  });
+});
+
+describe('CoreIpcHandlers — a temp file that cannot be deleted', () => {
+  it('core:cleanupProcessed logs it and replies { ok: false }', async () => {
+    const { invoke, tempFileManager, logger } = setup();
+    tempFileManager.cleanupTempFile.mockRejectedValueOnce(busyError());
+
+    const reply = await invoke('core:cleanupProcessed', TEMP_OUTPUT);
+
+    expect(reply).toEqual({ ok: false, error: 'Error: EBUSY: resource busy' });
+    expect(logger.error).toHaveBeenCalledWith(
+      'Could not delete a processed temp file',
+      expect.objectContaining({ code: 'EBUSY' })
+    );
+  });
+
+  it('core:process logs it and still processes', async () => {
+    const { invoke, tempFileManager, logger } = setup();
+    tempFileManager.cleanupForSender.mockRejectedValueOnce(busyError());
+
+    const reply = await invoke('core:process', { filePath: SONG });
+
+    expect(reply).toEqual({ ok: true, processedPath: TEMP_OUTPUT });
+    expect(logger.error).toHaveBeenCalledTimes(1);
   });
 });
 

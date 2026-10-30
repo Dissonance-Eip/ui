@@ -11,6 +11,7 @@
  * request that was sent to another. The preload side echoes `requestId`.
  */
 const { randomUUID } = require('crypto');
+const { logger } = require('../main/logger');
 
 function isLive(webContents) {
   return !!webContents && !(webContents.isDestroyed && webContents.isDestroyed());
@@ -32,7 +33,7 @@ function sendToRenderer(webContents, channel, payload) {
     webContents.send(channel, payload);
     return true;
   } catch (e) {
-    console.error('Failed to send', channel, e);
+    logger.error('Failed to send', channel, e);
     return false;
   }
 }

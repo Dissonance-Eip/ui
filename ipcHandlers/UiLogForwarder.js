@@ -5,6 +5,7 @@
  */
 const { ipcMain } = require('electron');
 const { IpcChannels } = require('./ipcChannels');
+const { logger } = require('../main/logger');
 
 class UiLogForwarder {
   /** @param {{ipc?: import('events').EventEmitter}} [opts] ipc defaults to ipcMain; tests pass a double */
@@ -17,10 +18,9 @@ class UiLogForwarder {
       try {
         const level = payload && payload.level ? String(payload.level) : 'log';
         const message = payload && payload.message != null ? String(payload.message) : '';
-        const fn = typeof console[level] === 'function' ? console[level] : console.log;
-        fn(`[UI] ${message}`);
+        logger.at(level, `[UI] ${message}`);
       } catch (e) {
-        console.log('[UI] (log forwarding failed)', e);
+        logger.error('[UI] (log forwarding failed)', e);
       }
     });
   }

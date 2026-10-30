@@ -10,6 +10,10 @@
  *   cleanupTempFile(path)      – unlink a single tracked-or-under-root file
  *   cleanupAll()               – unlink everything we registered (called on quit)
  *
+ * A file that is already gone counts as cleaned up. Any other unlink error
+ * (EPERM, EBUSY, ...) is thrown by cleanupTempFile/cleanupForSender, and the
+ * file stays tracked; cleanupAll logs each failure and never throws.
+ *
  * isUnderRoot() guards against accidentally unlinking arbitrary user files
  * if a path was ever spoofed through IPC.
  */
@@ -17,12 +21,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const os = require('os');
 const { randomUUID } = require('crypto');
+const { logger: mainLogger } = require('../../main/logger');
 
 const UNIQUE_SUFFIX_LENGTH = 8;
 
 class TempFileManager {
-  constructor({ rootDir } = {}) {
+  constructor({ rootDir, logger = mainLogger } = {}) {
     this.rootDir = rootDir || path.join(os.tmpdir(), 'dissonance');
+    this.logger = logger;
     this.tempFiles = new Set();
     this.tempFileBySenderId = new Map();
   }
@@ -73,17 +79,20 @@ class TempFileManager {
     try {
       const rel = path.relative(this.rootDir, filePath);
       return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
-    } catch (_e) {
+    } catch (e) {
+      this.logger.warn(`Could not compare ${filePath} with the temp root`, e);
       return false;
     }
   }
 
+  /** Deletes filePath; already gone is fine, any other failure is thrown. */
   async safeUnlink(filePath) {
     if (!filePath) return;
     try {
       await fs.unlink(filePath);
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      if (e && e.code === 'ENOENT') return;
+      throw e;
     }
   }
 
@@ -107,7 +116,12 @@ class TempFileManager {
 
   async cleanupAll() {
     const paths = Array.from(this.tempFiles);
-    await Promise.all(paths.map((p) => this.safeUnlink(p)));
+    const results = await Promise.allSettled(paths.map((p) => this.safeUnlink(p)));
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        this.logger.error(`Could not delete temp file ${paths[i]}`, result.reason);
+      }
+    });
     this.tempFiles.clear();
     this.tempFileBySenderId.clear();
   }

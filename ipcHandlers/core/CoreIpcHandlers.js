@@ -23,6 +23,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { senderOf, sendToRenderer } = require('../rendererMessaging');
 const { IpcChannels } = require('../ipcChannels');
+const { logger: mainLogger } = require('../../main/logger');
 const { checkExportSource, checkExportDestination } = require('./exportPaths');
 const {
   checkFilePath,
@@ -64,6 +65,7 @@ class CoreIpcHandlers {
     tagWriteCoordinator,
     ipc = electron.ipcMain,
     dialog = electron.dialog,
+    logger = mainLogger,
   }) {
     this.coreAddon = coreAddon;
     this.coreLoadError = coreLoadError;
@@ -72,6 +74,7 @@ class CoreIpcHandlers {
     this.tagWriteCoordinator = tagWriteCoordinator;
     this.ipc = ipc;
     this.dialog = dialog;
+    this.logger = logger;
   }
 
   register() {
@@ -92,8 +95,10 @@ class CoreIpcHandlers {
     const invalid = firstInvalid(checkProcessedPath(processedPath));
     if (invalid) return invalid;
 
-    await this.tempFileManager.cleanupTempFile(processedPath);
-    return { ok: true };
+    const error = await this._deleteTempFile(() =>
+      this.tempFileManager.cleanupTempFile(processedPath)
+    );
+    return error ? { ok: false, error: String(error) } : { ok: true };
   }
 
   async process(event, payload) {
@@ -106,7 +111,8 @@ class CoreIpcHandlers {
     const unavailable = this._requireAddonFn('process', 'Core addon not available');
     if (unavailable) return unavailable;
 
-    if (senderId) await this.tempFileManager.cleanupForSender(senderId);
+    // A leftover that can't be deleted must not block a new run.
+    if (senderId) await this._deleteTempFile(() => this.tempFileManager.cleanupForSender(senderId));
 
     // Generate a temp output path so processed files don't land next to
     // the user's input (which would also surprise-delete them on cleanup).
@@ -136,7 +142,7 @@ class CoreIpcHandlers {
       });
       return { ok: true, processedPath };
     } catch (err) {
-      console.error('Core addon processing error', err);
+      this.logger.error('Core addon processing error', err);
       sendToRenderer(sender, STATUS_CHANNEL, {
         status: 'error',
         message: 'Processing failed',
@@ -154,7 +160,7 @@ class CoreIpcHandlers {
     try {
       return await this.tagWriteCoordinator.readMetadata(senderOf(event).senderId, filePath);
     } catch (err) {
-      console.error('core:readMetadata error', err);
+      this.logger.error('core:readMetadata error', err);
       return { ok: false, error: String(err) };
     }
   }
@@ -171,7 +177,7 @@ class CoreIpcHandlers {
     try {
       return await this.tagWriteCoordinator.writeTags(senderOf(event).senderId, filePath, tags);
     } catch (err) {
-      console.error('core:writeTags error', err);
+      this.logger.error('core:writeTags error', err);
       return { ok: false, error: String(err) };
     }
   }
@@ -196,7 +202,8 @@ class CoreIpcHandlers {
 
       await fs.copyFile(processedPath, filePath);
 
-      await this.tempFileManager.cleanupTempFile(processedPath);
+      // The export succeeded; a temp file that can't be deleted is only logged.
+      await this._deleteTempFile(() => this.tempFileManager.cleanupTempFile(processedPath));
 
       sendToRenderer(sender, STATUS_CHANNEL, {
         status: 'exported',
@@ -206,7 +213,7 @@ class CoreIpcHandlers {
 
       return { ok: true, exportedPath: filePath };
     } catch (err) {
-      console.error('Export error', err);
+      this.logger.error('Export error', err);
       sendToRenderer(sender, STATUS_CHANNEL, { status: 'error', message: 'Export failed' });
       return { ok: false, error: String(err) };
     }
@@ -218,6 +225,21 @@ class CoreIpcHandlers {
    * @returns {object|null}   null when `coreAddon[name]` is callable, else the
    *                          `{ ok: false, code: ENGINE_UNAVAILABLE }` reply
    */
+  /**
+   * Runs a temp-file cleanup. A failure (EPERM, EBUSY, ...) is logged and
+   * returned instead of thrown, so it never aborts the flow around it.
+   * @returns {Promise<Error|null>}
+   */
+  async _deleteTempFile(cleanup) {
+    try {
+      await cleanup();
+      return null;
+    } catch (err) {
+      this.logger.error('Could not delete a processed temp file', err);
+      return err;
+    }
+  }
+
   _requireAddonFn(name, error = `Core addon ${name} not available`) {
     if (this.coreAddon && typeof this.coreAddon[name] === 'function') return null;
     return {
