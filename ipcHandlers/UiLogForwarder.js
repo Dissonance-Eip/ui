@@ -7,9 +7,13 @@ const { ipcMain } = require('electron');
 const { IpcChannels } = require('./ipcChannels');
 
 class UiLogForwarder {
-  /** @param {import('events').EventEmitter} [ipc] ipcMain, or a test double */
-  register(ipc = ipcMain) {
-    ipc.on(IpcChannels.UI_LOG, (_event, payload) => {
+  /** @param {{ipc?: import('events').EventEmitter}} [opts] ipc defaults to ipcMain; tests pass a double */
+  constructor({ ipc = ipcMain } = {}) {
+    this.ipc = ipc;
+  }
+
+  register() {
+    this.ipc.on(IpcChannels.UI_LOG, (_event, payload) => {
       try {
         const level = payload && payload.level ? String(payload.level) : 'log';
         const message = payload && payload.message != null ? String(payload.message) : '';

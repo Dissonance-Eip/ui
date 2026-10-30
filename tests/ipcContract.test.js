@@ -53,8 +53,8 @@ function recordPreloadChannels() {
 /** Registers every main-side IPC module on one fake ipcMain. */
 function registerMainSide() {
   const ipc = makeHandlingIpc();
-  new UiLogForwarder().register(ipc);
-  new FileDialogHandlers().register(ipc);
+  new UiLogForwarder({ ipc }).register();
+  new FileDialogHandlers({ ipc }).register();
   registerThemeHandlers({
     ipc,
     nativeTheme: new EventEmitter(),
@@ -62,7 +62,7 @@ function registerMainSide() {
     getWindows: () => [],
     platform: 'darwin',
   });
-  new CoreIpcHandlers({ coreAddon: null }).register(ipc);
+  new CoreIpcHandlers({ coreAddon: null, ipc }).register();
   return ipc;
 }
 

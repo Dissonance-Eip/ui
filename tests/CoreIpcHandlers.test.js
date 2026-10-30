@@ -43,7 +43,8 @@ function setup({ coreAddon = makeAddon(), coreLoadError = null } = {}) {
     tempFileManager,
     fileLock: new FileLock(),
     tagWriteCoordinator,
-  }).register(ipc);
+    ipc,
+  }).register();
   const sender = makeWebContents();
   const invoke = (channel, payload) => ipc.handlers.get(channel)({ sender }, payload);
   return { ipc, invoke, sender, coreAddon, tempFileManager, tagWriteCoordinator };

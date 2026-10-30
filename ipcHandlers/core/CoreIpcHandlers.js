@@ -17,7 +17,7 @@
  * When the engine is unavailable, the addon-backed channels reply with
  * `code: ENGINE_UNAVAILABLE` and the loader's `reason`, so the UI can say so.
  */
-const { ipcMain, dialog } = require('electron');
+const electron = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
 const { senderOf, sendToRenderer } = require('../rendererMessaging');
@@ -39,17 +39,28 @@ class CoreIpcHandlers {
    * @param {import('./TempFileManager').TempFileManager} opts.tempFileManager
    * @param {import('./FileLock').FileLock} opts.fileLock
    * @param {import('./TagWriteCoordinator').TagWriteCoordinator} opts.tagWriteCoordinator
+   * @param {{handle: Function}} [opts.ipc]  defaults to Electron's ipcMain; tests pass a double
+   * @param {object} [opts.dialog]          defaults to Electron's dialog
    */
-  constructor({ coreAddon, coreLoadError = null, tempFileManager, fileLock, tagWriteCoordinator }) {
+  constructor({
+    coreAddon,
+    coreLoadError = null,
+    tempFileManager,
+    fileLock,
+    tagWriteCoordinator,
+    ipc = electron.ipcMain,
+    dialog = electron.dialog,
+  }) {
     this.coreAddon = coreAddon;
     this.coreLoadError = coreLoadError;
     this.tempFileManager = tempFileManager;
     this.fileLock = fileLock;
     this.tagWriteCoordinator = tagWriteCoordinator;
+    this.ipc = ipc;
+    this.dialog = dialog;
   }
 
-  /** @param {{handle: Function}} [ipc] ipcMain, or a test double */
-  register(ipc = ipcMain) {
+  register() {
     const handlers = {
       [IpcChannels.CORE_CLEANUP_PROCESSED]: this.cleanupProcessed,
       [IpcChannels.CORE_PROCESS]: this.process,
@@ -58,7 +69,7 @@ class CoreIpcHandlers {
       [IpcChannels.CORE_EXPORT]: this.export,
     };
     Object.entries(handlers).forEach(([channel, handler]) =>
-      ipc.handle(channel, handler.bind(this))
+      this.ipc.handle(channel, handler.bind(this))
     );
   }
 
@@ -163,7 +174,7 @@ class CoreIpcHandlers {
       if (destPath) {
         filePath = destPath;
       } else {
-        const result = await dialog.showSaveDialog({
+        const result = await this.dialog.showSaveDialog({
           title: 'Export processed file',
           defaultPath: path.basename(processedPathStr),
           filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
