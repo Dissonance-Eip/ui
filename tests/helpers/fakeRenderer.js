@@ -147,6 +147,24 @@ export function makeEventTarget() {
   };
 }
 
+/**
+ * A DOM-element-like event target with a working `classList`
+ * (`classList.has(name)` reads it back).
+ */
+export function makeElement() {
+  const classes = new Set();
+  return Object.assign(makeEventTarget(), {
+    classList: {
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      has: (name) => classes.has(name),
+      get size() {
+        return classes.size;
+      },
+    },
+  });
+}
+
 /** A drag event carrying `files`; preventDefault/stopPropagation are spies. */
 export function makeDragEvent(files = []) {
   return {

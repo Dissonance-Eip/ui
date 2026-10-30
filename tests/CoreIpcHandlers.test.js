@@ -115,6 +115,28 @@ describe('CoreIpcHandlers — core:process', () => {
     });
   });
 
+  it('reports the output path it chose when the addon does not name one', async () => {
+    const coreAddon = makeAddon();
+    coreAddon.process.mockResolvedValue(undefined);
+    const { invoke, sender, tempFileManager } = setup({ coreAddon });
+
+    const reply = await invoke('core:process', { filePath: SONG });
+
+    expect(reply).toEqual({ ok: true, processedPath: TEMP_OUTPUT });
+    expect(tempFileManager.registerForSender).toHaveBeenCalledWith(sender.id, TEMP_OUTPUT);
+    expect(statusesSentTo(sender).at(-1)).toMatchObject({ processedPath: TEMP_OUTPUT });
+  });
+
+  it('still tracks the output of a request without a sender window', async () => {
+    const { ipc, tempFileManager } = setup();
+
+    const reply = await ipc.handlers.get('core:process')({}, { filePath: SONG });
+
+    expect(reply).toEqual({ ok: true, processedPath: TEMP_OUTPUT });
+    expect(tempFileManager.cleanupForSender).not.toHaveBeenCalled();
+    expect(tempFileManager.registerForSender).toHaveBeenCalledWith(null, TEMP_OUTPUT);
+  });
+
   it('reports a processing failure on core:status and in the reply', async () => {
     const coreAddon = makeAddon();
     coreAddon.process.mockRejectedValue(new Error('bad wav'));
@@ -146,11 +168,21 @@ describe('CoreIpcHandlers — core:readMetadata and core:writeTags', () => {
     expect(tagWriteCoordinator.writeTags).toHaveBeenCalledWith(sender.id, SONG, {});
   });
 
-  it('turns a coordinator error into { ok: false }', async () => {
+  it('turns a coordinator read error into { ok: false }', async () => {
     const { invoke, tagWriteCoordinator } = setup();
     tagWriteCoordinator.readMetadata.mockRejectedValue(new Error('locked'));
 
     expect(await invoke('core:readMetadata', SONG)).toEqual({ ok: false, error: 'Error: locked' });
+  });
+
+  it('turns a coordinator write error into { ok: false }', async () => {
+    const { invoke, tagWriteCoordinator } = setup();
+    tagWriteCoordinator.writeTags.mockRejectedValue(new Error('read-only file'));
+
+    expect(await invoke('core:writeTags', { filePath: SONG, tags: { title: 'New' } })).toEqual({
+      ok: false,
+      error: 'Error: read-only file',
+    });
   });
 });
 

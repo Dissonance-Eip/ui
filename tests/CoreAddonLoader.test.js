@@ -6,6 +6,12 @@ const UI_ROOT = '/app/ui';
 const PLATFORM_FILE = path.join(UI_ROOT, 'Build', 'Release', 'dissonance_core-darwin-arm64.node');
 const GENERIC_FILE = path.join(UI_ROOT, 'Build', 'Release', 'dissonance_core.node');
 const LOWERCASE_BUILD_FILE = path.join(UI_ROOT, 'build', 'Release', 'dissonance_core.node');
+const LOWERCASE_PLATFORM_FILE = path.join(
+  UI_ROOT,
+  'build',
+  'Release',
+  'dissonance_core-darwin-arm64.node'
+);
 const OVERRIDE_FILE = '/custom/dissonance_core.node';
 const FAKE_ADDON = Object.freeze({ process() {}, readMetadata() {}, writeTags() {} });
 
@@ -85,6 +91,56 @@ describe('CoreAddonLoader — result shape', () => {
       source: 'bindings',
       error: null,
     });
+  });
+
+  it('falls back to a platform-named file in build/Release', () => {
+    const { loader } = setup({ files: { [LOWERCASE_PLATFORM_FILE]: FAKE_ADDON } });
+
+    expect(loader.load()).toEqual({
+      addon: FAKE_ADDON,
+      source: LOWERCASE_PLATFORM_FILE,
+      error: null,
+    });
+  });
+
+  it('looks for the files in the documented order before trying node-bindings', () => {
+    const { loader, existsSync, requireFn } = setup({
+      env: { DISSONANCE_CORE_ADDON_PATH: OVERRIDE_FILE },
+    });
+
+    loader.load();
+
+    expect(existsSync.mock.calls.map(([p]) => p)).toEqual([
+      OVERRIDE_FILE,
+      PLATFORM_FILE,
+      GENERIC_FILE,
+      LOWERCASE_BUILD_FILE,
+      LOWERCASE_PLATFORM_FILE,
+    ]);
+    expect(requiredIds(requireFn)).toEqual(['bindings']);
+  });
+
+  it('stops at the first strategy that loads', () => {
+    const { loader, requireFn } = setup({
+      files: { [PLATFORM_FILE]: FAKE_ADDON, [GENERIC_FILE]: { other: true } },
+      bindings: { other: true },
+    });
+
+    loader.load();
+
+    expect(requiredIds(requireFn)).toEqual([PLATFORM_FILE]);
+  });
+
+  it('treats a file check that throws as a missing file and keeps looking', () => {
+    const { loader, existsSync, requireFn } = setup({ bindings: FAKE_ADDON });
+    existsSync.mockImplementation(() => {
+      throw new Error('EACCES');
+    });
+
+    const result = loader.load();
+
+    expect(result).toEqual({ addon: FAKE_ADDON, source: 'bindings', error: null });
+    expect(requiredIds(requireFn)).toEqual(['bindings']);
   });
 
   it('moves on to the next strategy when a file exists but fails to load', () => {

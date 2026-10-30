@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { MainWindowManager } from '../main/MainWindowManager.js';
 import { DEV_MODE_ARG } from '../main/windowSecurity.js';
 import { makeBrowserWindowClass } from './helpers/fakeElectron.js';
@@ -12,10 +12,11 @@ function makeManager({
   BrowserWindowClass = makeBrowserWindowClass(),
   isDevelopment = false,
   openExternal = vi.fn(),
+  iconPath = null,
 } = {}) {
   return new MainWindowManager({
     preloadPath: '/preload.js',
-    iconPath: null,
+    iconPath,
     indexPath: INDEX_PATH,
     isDevelopment,
     openExternal,
@@ -67,6 +68,46 @@ describe('MainWindowManager', () => {
     manager.getWindows().pop();
 
     expect(manager.getWindows()).toHaveLength(1);
+  });
+
+  it('shows a window only once it is ready to show', () => {
+    const win = makeManager().createWindow();
+    expect(win.show).not.toHaveBeenCalled();
+
+    win.emit('ready-to-show');
+
+    expect(win.show).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a window that fails to show', () => {
+    const win = makeManager().createWindow();
+    win.show.mockImplementation(() => {
+      throw new Error('destroyed');
+    });
+
+    expect(() => win.emit('ready-to-show')).not.toThrow();
+  });
+
+  it('applies the requested size and keeps the minimum size', () => {
+    const win = makeManager().createWindow({ width: 1024, height: 900 });
+
+    expect(win.options).toMatchObject({ width: 1024, height: 900, minWidth: 560, minHeight: 680 });
+  });
+});
+
+describe('MainWindowManager window icon', () => {
+  it('uses the icon file when it exists', () => {
+    const iconPath = fileURLToPath(new URL('../resources/icon.png', import.meta.url));
+
+    const win = makeManager({ iconPath }).createWindow();
+
+    expect(win.options.icon).toBe(iconPath);
+  });
+
+  it('leaves the icon out when the file is missing', () => {
+    const win = makeManager({ iconPath: '/nowhere/icon.png' }).createWindow();
+
+    expect(win.options).not.toHaveProperty('icon');
   });
 });
 
