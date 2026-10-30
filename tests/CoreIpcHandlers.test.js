@@ -183,3 +183,37 @@ describe('CoreIpcHandlers — engine unavailable', () => {
     });
   });
 });
+
+describe('CoreIpcHandlers — every core:* payload is type-checked', () => {
+  it.each([
+    ['core:process', { filePath: 42 }, 'No file path provided'],
+    ['core:process', { filePath: SONG, options: 'fast' }, 'Invalid processing options'],
+    [
+      'core:process',
+      { filePath: SONG, options: { modes: 'shield' } },
+      'Invalid processing options',
+    ],
+    ['core:readMetadata', { filePath: SONG }, 'No file path provided'],
+    ['core:writeTags', { filePath: ['/a.wav'], tags: {} }, 'No file path provided'],
+    ['core:writeTags', { filePath: SONG, tags: 'title' }, 'Invalid tags'],
+    ['core:writeTags', { filePath: SONG, tags: { title: 42 } }, 'Invalid tags'],
+    ['core:cleanupProcessed', { processedPath: 42 }, 'No processed file path'],
+    ['core:cleanupProcessed', 42, 'No processed file path'],
+  ])('%s rejects %j before touching the addon or disk', async (channel, payload, error) => {
+    const { invoke, coreAddon, tempFileManager, tagWriteCoordinator } = setup();
+
+    expect(await invoke(channel, payload)).toEqual({ ok: false, error });
+    expect(coreAddon.process).not.toHaveBeenCalled();
+    expect(tagWriteCoordinator.readMetadata).not.toHaveBeenCalled();
+    expect(tagWriteCoordinator.writeTags).not.toHaveBeenCalled();
+    expect(tempFileManager.cleanupTempFile).not.toHaveBeenCalled();
+  });
+
+  it('core:process still treats null options as none', async () => {
+    const { invoke, coreAddon } = setup();
+
+    await invoke('core:process', { filePath: SONG, options: null });
+
+    expect(coreAddon.process).toHaveBeenCalledWith(SONG, { outputPath: TEMP_OUTPUT });
+  });
+});

@@ -14,7 +14,8 @@
  * "exported") go back on `core:status` to the window that made the request
  * (`event.sender`), never to a fixed window.
  *
- * When the engine is unavailable, the addon-backed channels reply with
+ * Every payload is type-checked first (corePayloads.js; core:export uses
+ * exportPaths.js). When the engine is unavailable, the addon-backed channels reply with
  * `code: ENGINE_UNAVAILABLE` and the loader's `reason`, so the UI can say so.
  */
 const electron = require('electron');
@@ -23,6 +24,12 @@ const path = require('path');
 const { senderOf, sendToRenderer } = require('../rendererMessaging');
 const { IpcChannels } = require('../ipcChannels');
 const { checkExportSource, checkExportDestination } = require('./exportPaths');
+const {
+  checkFilePath,
+  checkProcessedPath,
+  checkProcessOptions,
+  checkTags,
+} = require('./corePayloads');
 
 const STATUS_CHANNEL = IpcChannels.CORE_STATUS;
 const ENGINE_UNAVAILABLE = 'ENGINE_UNAVAILABLE';
@@ -30,6 +37,12 @@ const ENGINE_UNAVAILABLE = 'ENGINE_UNAVAILABLE';
 /** `core:cleanupProcessed` takes a bare path or `{ processedPath }`. */
 function processedPathOf(payload) {
   return typeof payload === 'string' ? payload : (payload && payload.processedPath) || null;
+}
+
+/** The first failed check's `{ ok: false, error }` reply, or null when all pass. */
+function firstInvalid(...errors) {
+  const error = errors.find(Boolean);
+  return error ? { ok: false, error } : null;
 }
 
 class CoreIpcHandlers {
@@ -76,7 +89,8 @@ class CoreIpcHandlers {
 
   async cleanupProcessed(_event, payload) {
     const processedPath = processedPathOf(payload);
-    if (!processedPath) return { ok: false, error: 'No processed file path' };
+    const invalid = firstInvalid(checkProcessedPath(processedPath));
+    if (invalid) return invalid;
 
     await this.tempFileManager.cleanupTempFile(processedPath);
     return { ok: true };
@@ -87,8 +101,8 @@ class CoreIpcHandlers {
     const userOptions = payload?.options ?? {};
     const { sender, senderId } = senderOf(event);
 
-    if (!filePath || typeof filePath !== 'string')
-      return { ok: false, error: 'No file path provided' };
+    const invalid = firstInvalid(checkFilePath(filePath), checkProcessOptions(userOptions));
+    if (invalid) return invalid;
     const unavailable = this._requireAddonFn('process', 'Core addon not available');
     if (unavailable) return unavailable;
 
@@ -133,8 +147,8 @@ class CoreIpcHandlers {
   }
 
   async readMetadata(event, filePath) {
-    if (!filePath || typeof filePath !== 'string')
-      return { ok: false, error: 'No file path provided' };
+    const invalid = firstInvalid(checkFilePath(filePath));
+    if (invalid) return invalid;
     const unavailable = this._requireAddonFn('readMetadata');
     if (unavailable) return unavailable;
     try {
@@ -149,7 +163,8 @@ class CoreIpcHandlers {
     const filePath = payload && payload.filePath ? payload.filePath : null;
     const tags = payload && payload.tags ? payload.tags : {};
 
-    if (!filePath) return { ok: false, error: 'No file path provided' };
+    const invalid = firstInvalid(checkFilePath(filePath), checkTags(tags));
+    if (invalid) return invalid;
     const unavailable = this._requireAddonFn('writeTags');
     if (unavailable) return unavailable;
 
