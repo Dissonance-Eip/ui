@@ -8,12 +8,21 @@ import { vi } from 'vitest';
  */
 let nextWebContentsId = 1;
 
+/**
+ * A webContents-like emitter. `emit('will-navigate', event)` fakes a
+ * navigation; `windowOpenHandler` holds what setWindowOpenHandler() received.
+ */
 export function makeWebContents({ destroyed = false } = {}) {
-  return {
+  const webContents = new EventEmitter();
+  return Object.assign(webContents, {
     id: nextWebContentsId++,
     send: vi.fn(),
     isDestroyed: () => destroyed,
-  };
+    windowOpenHandler: null,
+    setWindowOpenHandler: (handler) => {
+      webContents.windowOpenHandler = handler;
+    },
+  });
 }
 
 /** An ipcMain-like emitter: `emitFrom(sender, channel, payload)` fakes a renderer message. */

@@ -11,7 +11,8 @@
  *   - UploadView, AnalyzeView, CompareView (constructed with their DOM nodes)
  *   - AppController.start() — registers all event handlers + flush flow
  *
- * Exposes the controller + logger on window for DevTools poking.
+ * In development only, exposes the controller + logger on window for
+ * DevTools poking (see debugGlobals.js).
  */
 import { TerminalLogger } from '../infrastructure/TerminalLogger.js';
 import { DissonanceApi } from '../infrastructure/DissonanceApi.js';
@@ -23,6 +24,7 @@ import { AnalyzeView } from '../views/AnalyzeView.js';
 import { CompareView } from '../views/CompareView.js';
 import { AppController } from '../controllers/AppController.js';
 import { WavMetadataService } from '../services/WavMetadataService.js';
+import { exposeDebugGlobals } from './debugGlobals.js';
 
 export function bootstrap() {
   const api = new DissonanceApi(window.dissonance);
@@ -106,7 +108,10 @@ export function bootstrap() {
 
   controller.start();
 
-  // Expose for debugging in DevTools
-  window.__logger = logger;
-  window.__app = controller;
+  exposeDebugGlobals({
+    target: window,
+    isDevelopment: api.isDevelopment(),
+    logger,
+    controller,
+  });
 }

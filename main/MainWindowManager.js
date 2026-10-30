@@ -4,17 +4,39 @@
  * (a second launch opens a second window, see main/singleInstance.js), and
  * exposes `getWindows()`: Electron's own list of open windows
  * (`BrowserWindow.getAllWindows()`), the single source for "open windows".
- * contextIsolation is on / nodeIntegration is off (renderer security).
+ * Every window is hardened the same way (main/windowSecurity.js): isolated,
+ * sandboxed renderer, and it can only show the app's own page.
  */
 const fs = require('fs');
+const { pathToFileURL } = require('url');
+const { secureWebPreferences, hardenNavigation } = require('./windowSecurity');
 
 const MIN_WINDOW_WIDTH = 560;
 const MIN_WINDOW_HEIGHT = 680;
 
 class MainWindowManager {
-  constructor({ preloadPath, iconPath, BrowserWindowClass = require('electron').BrowserWindow }) {
+  /**
+   * @param {object} opts
+   * @param {string} opts.preloadPath
+   * @param {string|null} opts.iconPath
+   * @param {string} opts.indexPath      the app page; the only page a window may show
+   * @param {boolean} [opts.isDevelopment] unpacked build: renderer exposes debug globals
+   * @param {(url: string) => unknown} [opts.openExternal] opens a web link in the system browser
+   * @param {Function} [opts.BrowserWindowClass]
+   */
+  constructor({
+    preloadPath,
+    iconPath,
+    indexPath,
+    isDevelopment = false,
+    openExternal = (url) => require('electron').shell.openExternal(url),
+    BrowserWindowClass = require('electron').BrowserWindow,
+  }) {
     this.preloadPath = preloadPath;
     this.iconPath = iconPath;
+    this.appUrl = pathToFileURL(indexPath).href;
+    this.isDevelopment = isDevelopment;
+    this._openExternal = openExternal;
     this._BrowserWindow = BrowserWindowClass;
   }
 
@@ -30,12 +52,12 @@ class MainWindowManager {
       ...(hasIcon ? { icon: this.iconPath } : {}),
       minWidth: MIN_WINDOW_WIDTH,
       minHeight: MIN_WINDOW_HEIGHT,
-      webPreferences: {
-        preload: this.preloadPath,
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
+      webPreferences: secureWebPreferences({
+        preloadPath: this.preloadPath,
+        isDevelopment: this.isDevelopment,
+      }),
     });
+    hardenNavigation(win, { appUrl: this.appUrl, openExternal: this._openExternal });
 
     win.once('ready-to-show', () => {
       try {

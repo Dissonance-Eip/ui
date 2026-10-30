@@ -25,9 +25,13 @@ class MainApplication {
   constructor({ uiRoot = path.join(__dirname, '..') } = {}) {
     this.uiRoot = uiRoot;
     this.iconPath = path.join(this.uiRoot, 'resources', 'icon.png');
+    this.indexPath = path.join(this.uiRoot, 'index.html');
     this.windowManager = new MainWindowManager({
       preloadPath: path.join(this.uiRoot, 'preload.js'),
       iconPath: this.iconPath,
+      indexPath: this.indexPath,
+      // Unpacked (`npm start`) = development; packaged builds are not.
+      isDevelopment: !app.isPackaged,
     });
 
     // Lifecycle flag: before-quit already flushed every window.
@@ -115,7 +119,7 @@ class MainApplication {
       isQuitting: () => this._readyToQuit,
     });
 
-    win.loadFile(path.join(this.uiRoot, 'index.html')).catch((e) => {
+    win.loadFile(this.indexPath).catch((e) => {
       console.error('Failed to load index.html:', e);
     });
     registerWindowHandlers(win);
