@@ -17,7 +17,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
 - `renderer/base/`
   - `Disposable.js` — tracks cleanups/unsubscribes in LIFO order.
   - `BaseComponent.js` — mount/unmount lifecycle + tracked `listen()` for events.
-  - `BaseController.js` — start/stop lifecycle on top of Disposable.
+  - `BaseController.js` — start() hook on top of Disposable; `dispose()` tears it down.
   - `BaseApi.js` — defensive wrapper around the preload bridge.
   - `Logger.js` — interface only; documents the Logger contract.
 - `renderer/infrastructure/`
@@ -57,7 +57,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - Update `state`.
   - Decide what to render.
 - **Lifecycle**:
-  - Anything that subscribes (event listener, IPC callback) should be tracked via `track()` so it is cleaned up on `unmount()` / `stop()`.
+  - Anything that subscribes (event listener, IPC callback) should be tracked via `track()` so it is cleaned up on `unmount()` / `dispose()`.
 - **File-level docstrings**: every module has a header comment explaining its role and any non-obvious gotchas. Per-function JSDoc only where the signature doesn't already tell you the contract (side effects, null semantics, etc.).
 
 ## Adding a new feature

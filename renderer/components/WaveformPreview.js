@@ -127,10 +127,6 @@ export class WaveformPreview extends BaseComponent {
     if (this.containerEl) this.containerEl.innerHTML = '';
   }
 
-  get audio() {
-    return this._player?.audio ?? null;
-  }
-
   get isPlaying() {
     return !!this._player?.isPlaying;
   }

@@ -41,8 +41,4 @@ export class Disposable {
 
     this._disposables.length = 0;
   }
-
-  get isDisposed() {
-    return this._disposed;
-  }
 }

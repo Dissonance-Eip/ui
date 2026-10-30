@@ -164,9 +164,7 @@ describe('DropZone — mounted on its element', () => {
   it('mounts without an element and emits nothing', () => {
     const { dropZone, onFileSelected } = makeDropZone();
 
-    dropZone.mount();
-
-    expect(dropZone.isMounted).toBe(true);
+    expect(() => dropZone.mount()).not.toThrow();
     expect(onFileSelected).not.toHaveBeenCalled();
   });
 

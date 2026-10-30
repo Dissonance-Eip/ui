@@ -86,10 +86,10 @@ describe('AppController.start', () => {
     expect(app.logger.log).toHaveBeenCalledWith('core:status — warming up');
   });
 
-  it('stop() unmounts the views and drops the core, window and DOM listeners', () => {
+  it('dispose() unmounts the views and drops the core, window and DOM listeners', () => {
     const app = startApp();
 
-    app.controller.stop();
+    app.controller.dispose();
 
     for (const view of [app.uploadView, app.analyzeView, app.compareView]) {
       expect(view.unmount).toHaveBeenCalled();
@@ -113,10 +113,10 @@ describe('AppController — quit flush subscription (#114)', () => {
     onAppFlushRequest.mockRestore();
   });
 
-  it('is dropped on stop()', () => {
+  it('is dropped on dispose()', () => {
     const app = startApp();
 
-    app.controller.stop();
+    app.controller.dispose();
 
     expect(app.bridge.unsubscribes.onAppFlushRequest).toHaveBeenCalled();
   });

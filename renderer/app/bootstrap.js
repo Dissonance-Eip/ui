@@ -4,7 +4,7 @@
  * Wires up the entire app on DOMContentLoaded:
  *   - api (DissonanceApi over the preload bridge)
  *   - logger (TerminalLogger → main process console)
- *   - SystemThemeWatcher (Tailwind dark-mode toggle)
+ *   - SystemThemeWatcher (Tailwind dark-mode toggle, stopped with the controller)
  *   - ViewRouter (upload / analyze / compare)
  *   - AppState (current + processed file paths)
  *   - WavMetadataService (response → display-friendly shape)
@@ -39,7 +39,8 @@ export function bootstrap() {
   logger.log('dissonance API available from preload');
 
   // Watch OS-level light/dark mode and apply Tailwind `dark` class.
-  new SystemThemeWatcher({ api }).start();
+  const themeWatcher = new SystemThemeWatcher({ api });
+  themeWatcher.start();
 
   const router = new ViewRouter({
     upload: document.getElementById('view-upload'),
@@ -99,6 +100,7 @@ export function bootstrap() {
   });
 
   controller.start();
+  controller.track(() => themeWatcher.stop());
 
   exposeDebugGlobals({
     target: window,

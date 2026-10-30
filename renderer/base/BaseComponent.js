@@ -8,18 +8,10 @@ import { Disposable } from './Disposable.js';
  * separate "BaseView": a view is just a component that owns a screen.
  */
 export class BaseComponent extends Disposable {
-  constructor() {
-    super();
-    this._mounted = false;
-  }
-
-  mount() {
-    this._mounted = true;
-  }
+  mount() {}
 
   unmount() {
     this.dispose();
-    this._mounted = false;
   }
 
   listen(el, eventName, handler, options) {
@@ -33,9 +25,5 @@ export class BaseComponent extends Disposable {
       }
     });
     return handler;
-  }
-
-  get isMounted() {
-    return this._mounted;
   }
 }
