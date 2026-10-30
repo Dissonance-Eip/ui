@@ -1,12 +1,11 @@
 /**
  * Third screen after processing: side-by-side comparison of the original
  * and the processed WAV. Hosts two independent WaveformPreview instances
- * + an info panel each + a single Export button. _renderInfo() is shared
- * between the two sides; otherwise each preview is fully encapsulated.
+ * + an info panel each (rendered by renderWavInfo) + a single Export button.
  */
 import { BaseComponent } from '../base/BaseComponent.js';
 import { WaveformPreview } from '../components/WaveformPreview.js';
-import { formatDuration, formatSampleRate, formatChannels } from '../utils/wavInfoFormatters.js';
+import { renderWavInfo } from './renderWavInfo.js';
 
 export class CompareView extends BaseComponent {
   constructor({
@@ -60,10 +59,6 @@ export class CompareView extends BaseComponent {
     this._origPreview.setFile(filePath);
   }
 
-  setProcessedAudioPreviewFile(filePath) {
-    this._procPreview.setFile(filePath);
-  }
-
   pauseAudioPreviews() {
     this._origPreview.pause();
     this._procPreview.pause();
@@ -79,29 +74,27 @@ export class CompareView extends BaseComponent {
   // ---------------------------------------------------------------------------
 
   setOriginalInfo(basicInfo) {
-    this._renderInfo(basicInfo, {
-      filenameEl: this.origFilenameEl,
-      durationEl: this.origDurationEl,
-      sampleRateEl: this.origSampleRateEl,
-      channelsEl: this.origChannelsEl,
-    });
+    renderWavInfo(
+      {
+        filenameEl: this.origFilenameEl,
+        durationEl: this.origDurationEl,
+        sampleRateEl: this.origSampleRateEl,
+        channelsEl: this.origChannelsEl,
+      },
+      basicInfo
+    );
   }
 
   setProcessedInfo(basicInfo) {
-    this._renderInfo(basicInfo, {
-      filenameEl: this.procFilenameEl,
-      durationEl: this.procDurationEl,
-      sampleRateEl: this.procSampleRateEl,
-      channelsEl: this.procChannelsEl,
-    });
-  }
-
-  _renderInfo(basicInfo, { filenameEl, durationEl, sampleRateEl, channelsEl }) {
-    const { filename, durationSec, sampleRate, channels } = basicInfo || {};
-    if (filenameEl) filenameEl.textContent = filename || '—';
-    if (durationEl) durationEl.textContent = formatDuration(durationSec);
-    if (sampleRateEl) sampleRateEl.textContent = formatSampleRate(sampleRate);
-    if (channelsEl) channelsEl.textContent = formatChannels(channels);
+    renderWavInfo(
+      {
+        filenameEl: this.procFilenameEl,
+        durationEl: this.procDurationEl,
+        sampleRateEl: this.procSampleRateEl,
+        channelsEl: this.procChannelsEl,
+      },
+      basicInfo
+    );
   }
 
   // ---------------------------------------------------------------------------

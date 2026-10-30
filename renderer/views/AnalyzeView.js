@@ -12,7 +12,7 @@
  */
 import { BaseComponent } from '../base/BaseComponent.js';
 import { WaveformPreview } from '../components/WaveformPreview.js';
-import { formatDuration, formatSampleRate, formatChannels } from '../utils/wavInfoFormatters.js';
+import { renderWavInfo } from './renderWavInfo.js';
 import { basename } from '../utils/pathUtils.js';
 import { canProcess } from '../utils/processingOptions.js';
 
@@ -119,12 +119,16 @@ export class AnalyzeView extends BaseComponent {
    *          channels?: number, tags?: object}|null} basicInfo
    */
   setBasicWavInfo(basicInfo) {
-    const { durationSec, sampleRate, channels, tags } = basicInfo || {};
+    renderWavInfo(
+      {
+        durationEl: this.metaDurationEl,
+        sampleRateEl: this.metaSampleRateEl,
+        channelsEl: this.metaChannelsEl,
+      },
+      basicInfo
+    );
 
-    if (this.metaDurationEl) this.metaDurationEl.textContent = formatDuration(durationSec);
-    if (this.metaSampleRateEl) this.metaSampleRateEl.textContent = formatSampleRate(sampleRate);
-    if (this.metaChannelsEl) this.metaChannelsEl.textContent = formatChannels(channels);
-
+    const tags = basicInfo && basicInfo.tags;
     if (tags) this.setMetadataTags(tags);
   }
 
