@@ -110,7 +110,8 @@ class MainApplication {
       }
 
       event.preventDefault();
-      flushWindows(this.ipc, openWindows).then(() => {
+      // Never rejects: each window's flush resolves on answer or timeout.
+      void flushWindows(this.ipc, openWindows).then(() => {
         this._readyToQuit = true;
         app.quit();
       });
