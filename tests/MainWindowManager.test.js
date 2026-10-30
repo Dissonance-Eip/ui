@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { MainWindowManager } from '../main/MainWindowManager.js';
-import { FakeBrowserWindow } from './helpers/fakeElectron.js';
+import { makeBrowserWindowClass } from './helpers/fakeElectron.js';
 
-function makeManager() {
-  return new MainWindowManager({
-    preloadPath: '/preload.js',
-    iconPath: null,
-    BrowserWindowClass: FakeBrowserWindow,
-  });
+function makeManager(BrowserWindowClass = makeBrowserWindowClass()) {
+  return new MainWindowManager({ preloadPath: '/preload.js', iconPath: null, BrowserWindowClass });
 }
 
 describe('MainWindowManager', () => {
@@ -39,6 +35,15 @@ describe('MainWindowManager', () => {
     first.close();
 
     expect(manager.getWindows()).toEqual([second]);
+  });
+
+  it("uses Electron's list of open windows as the only source", () => {
+    const BrowserWindowClass = makeBrowserWindowClass();
+    const manager = makeManager(BrowserWindowClass);
+    const created = manager.createWindow();
+    const openedElsewhere = new BrowserWindowClass();
+
+    expect(manager.getWindows()).toEqual([created, openedElsewhere]);
   });
 
   it('returns a copy so callers cannot change the tracked list', () => {

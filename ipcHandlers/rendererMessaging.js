@@ -1,6 +1,7 @@
 /**
  * Main → renderer messaging shared by every window.
  *
+ *   senderOf()           – the webContents (and its id) behind an IPC event
  *   sendToRenderer()     – fire-and-forget push that tolerates closed windows
  *   requestRendererAck() – push a request and wait until THAT window answers
  *                          with the same requestId (or a timeout passes)
@@ -13,6 +14,15 @@ const { randomUUID } = require('crypto');
 
 function isLive(webContents) {
   return !!webContents && !(webContents.isDestroyed && webContents.isDestroyed());
+}
+
+/**
+ * @param {{sender?: object}|undefined} event  an ipcMain event
+ * @returns {{sender: object|null, senderId: number|null}}
+ */
+function senderOf(event) {
+  const sender = (event && event.sender) || null;
+  return { sender, senderId: sender ? sender.id : null };
 }
 
 /** @returns {boolean} true if the message was handed to the renderer */
@@ -59,4 +69,4 @@ function requestRendererAck({ ipc, webContents, requestChannel, doneChannel, pay
   });
 }
 
-module.exports = { sendToRenderer, requestRendererAck };
+module.exports = { senderOf, sendToRenderer, requestRendererAck };

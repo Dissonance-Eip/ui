@@ -1,8 +1,9 @@
 /**
- * Creates and tracks the application BrowserWindows.
+ * Creates the application BrowserWindows.
  * Holds the configured preload path, creates a new window on every request
  * (a second launch opens a second window, see main/singleInstance.js), and
- * exposes `getWindows()` so other modules don't have to track lifecycle.
+ * exposes `getWindows()`: Electron's own list of open windows
+ * (`BrowserWindow.getAllWindows()`), the single source for "open windows".
  * contextIsolation is on / nodeIntegration is off (renderer security).
  */
 const fs = require('fs');
@@ -15,7 +16,6 @@ class MainWindowManager {
     this.preloadPath = preloadPath;
     this.iconPath = iconPath;
     this._BrowserWindow = BrowserWindowClass;
-    this._windows = [];
   }
 
   createWindow({ width = 800, height = 700 } = {}) {
@@ -37,8 +37,6 @@ class MainWindowManager {
       },
     });
 
-    this._windows = [...this._windows, win];
-
     win.once('ready-to-show', () => {
       try {
         win.show();
@@ -47,16 +45,12 @@ class MainWindowManager {
       }
     });
 
-    win.on('closed', () => {
-      this._windows = this._windows.filter((w) => w !== win);
-    });
-
     return win;
   }
 
-  /** Open windows, oldest first. Returns a copy. */
+  /** Open windows, as Electron lists them. Returns a new array on every call. */
   getWindows() {
-    return [...this._windows];
+    return this._BrowserWindow.getAllWindows();
   }
 }
 

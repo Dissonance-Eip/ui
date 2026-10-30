@@ -11,7 +11,7 @@
  *     window so an unresponsive renderer can never hang quit.
  *   - Final temp-file cleanup on `will-quit` (exactly once per session).
  */
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -52,7 +52,7 @@ class MainApplication {
       this._applyDockIcon();
 
       app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
+        if (this.windowManager.getWindows().length === 0) {
           this._createAndInitWindow();
         }
       });
@@ -67,7 +67,7 @@ class MainApplication {
     app.on('before-quit', (event) => {
       if (this._readyToQuit) return;
 
-      const openWindows = this.windowManager.getWindows().filter((win) => !win.isDestroyed());
+      const openWindows = this.windowManager.getWindows();
       if (openWindows.length === 0) {
         // No window to flush through (all closed via X already, in which
         // case each close-handler did its flush). Just exit.

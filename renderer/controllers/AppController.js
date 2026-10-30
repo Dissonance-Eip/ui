@@ -372,14 +372,19 @@ export class AppController extends BaseController {
    * Called from importFile, processCurrentFile, and the quit flush handler.
    */
   async _pauseAndFlushTags() {
-    this.analyzeView.pauseAudioPreview();
-    this.compareView.pauseAudioPreviews?.();
+    this._pauseAllPreviews();
 
     if (this.state.currentFilePath) {
       this._tagQueue.enqueue(this.state.currentFilePath, this.analyzeView.getMetadataTags());
     }
 
     await this._tagQueue.flush();
+  }
+
+  /** Pause every audio preview in this window (analyze + both compare players). */
+  _pauseAllPreviews() {
+    this.analyzeView.pauseAudioPreview();
+    this.compareView.pauseAudioPreviews?.();
   }
 
   /**
@@ -390,8 +395,7 @@ export class AppController extends BaseController {
    */
   pauseIfShowing(filePath) {
     if (!filePath || filePath !== this.state.currentFilePath) return;
-    this.analyzeView.pauseAudioPreview();
-    this.compareView.pauseAudioPreviews?.();
+    this._pauseAllPreviews();
   }
 
   /**
@@ -431,8 +435,7 @@ export class AppController extends BaseController {
   }
 
   _resetToUpload() {
-    this.analyzeView.pauseAudioPreview();
-    this.compareView.pauseAudioPreviews?.();
+    this._pauseAllPreviews();
     this.state.setCurrentFilePath(null);
     this._originalBasicInfo = null;
     this._processedBasicInfo = null;

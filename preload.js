@@ -62,9 +62,5 @@ contextBridge.exposeInMainWorld('dissonance', {
   onTagsWrittenElsewhere: (cb) => subscribe('tags:writtenElsewhere', cb),
   logToMain: (level, message) => ipcRenderer.send('ui:log', { level, message }),
   onCoreStatus: (cb) => subscribe('core:status', cb),
-  onSystemTheme: (cb) => {
-    const handler = (_event, data) => cb(data);
-    ipcRenderer.on('ui:systemTheme', handler);
-    return () => ipcRenderer.removeListener('ui:systemTheme', handler);
-  },
+  onSystemTheme: (cb) => subscribe('ui:systemTheme', cb),
 });

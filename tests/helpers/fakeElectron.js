@@ -40,15 +40,25 @@ export function makeAnsweringWebContents(ipc, { requestChannel, doneChannel, onR
 /**
  * A BrowserWindow-like emitter. `close()` emits a cancellable 'close' event
  * and, unless a listener called preventDefault(), destroys the window and
- * emits 'closed' like Electron does.
+ * emits 'closed' like Electron does. `getAllWindows()` lists the open
+ * windows of that class (use makeBrowserWindowClass() for an isolated list).
  */
 export class FakeBrowserWindow extends EventEmitter {
+  static getAllWindows() {
+    return Object.hasOwn(this, 'openWindows') ? [...this.openWindows] : [];
+  }
+
   constructor(options = {}) {
     super();
     this.options = options;
     this.webContents = makeWebContents();
     this._destroyed = false;
     this.show = vi.fn();
+    const WindowClass = this.constructor;
+    WindowClass.openWindows = [...WindowClass.getAllWindows(), this];
+    this.once('closed', () => {
+      WindowClass.openWindows = WindowClass.getAllWindows().filter((win) => win !== this);
+    });
   }
 
   isDestroyed() {
@@ -62,4 +72,9 @@ export class FakeBrowserWindow extends EventEmitter {
     this._destroyed = true;
     this.emit('closed');
   }
+}
+
+/** A fresh FakeBrowserWindow class whose getAllWindows() only sees its own windows. */
+export function makeBrowserWindowClass() {
+  return class extends FakeBrowserWindow {};
 }

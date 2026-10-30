@@ -16,7 +16,7 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
-const { sendToRenderer } = require('../rendererMessaging');
+const { senderOf, sendToRenderer } = require('../rendererMessaging');
 
 const STATUS_CHANNEL = 'core:status';
 
@@ -41,14 +41,13 @@ class CoreIpcHandlers {
     ipcMain.handle('core:process', async (event, payload) => {
       const filePath = payload?.filePath ?? null;
       const userOptions = payload?.options ?? {};
-      const sender = event?.sender ?? null;
+      const { sender, senderId } = senderOf(event);
 
       if (!filePath || typeof filePath !== 'string')
         return { ok: false, error: 'No file path provided' };
       if (!this.coreAddon || typeof this.coreAddon.process !== 'function')
         return { ok: false, error: 'Core addon not available' };
 
-      const senderId = sender?.id ?? null;
       if (senderId) await this.tempFileManager.cleanupForSender(senderId);
 
       // Generate a temp output path so processed files don't land next to
@@ -95,7 +94,7 @@ class CoreIpcHandlers {
       if (!this.coreAddon || typeof this.coreAddon.readMetadata !== 'function')
         return { ok: false, error: 'Core addon readMetadata not available' };
       try {
-        return await this.tagWriteCoordinator.readMetadata(event?.sender?.id ?? null, filePath);
+        return await this.tagWriteCoordinator.readMetadata(senderOf(event).senderId, filePath);
       } catch (err) {
         console.error('core:readMetadata error', err);
         return { ok: false, error: String(err) };
@@ -111,7 +110,7 @@ class CoreIpcHandlers {
         return { ok: false, error: 'Core addon writeTags not available' };
 
       try {
-        return await this.tagWriteCoordinator.writeTags(event?.sender?.id ?? null, filePath, tags);
+        return await this.tagWriteCoordinator.writeTags(senderOf(event).senderId, filePath, tags);
       } catch (err) {
         console.error('core:writeTags error', err);
         return { ok: false, error: String(err) };
@@ -124,7 +123,7 @@ class CoreIpcHandlers {
       const destPath = (payload && payload.destPath) || null;
 
       if (!processedPathStr) return { ok: false, error: 'No processed file path' };
-      const sender = event?.sender ?? null;
+      const { sender } = senderOf(event);
 
       try {
         let canceled = false;

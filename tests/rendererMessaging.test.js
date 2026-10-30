@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sendToRenderer, requestRendererAck } from '../ipcHandlers/rendererMessaging.js';
+import { sendToRenderer, requestRendererAck, senderOf } from '../ipcHandlers/rendererMessaging.js';
 import { makeIpc, makeWebContents } from './helpers/fakeElectron.js';
 
 const REQUEST = 'test:request';
@@ -41,6 +41,19 @@ describe('sendToRenderer', () => {
       throw new Error('gone');
     });
     expect(sendToRenderer(wc, 'ch', {})).toBe(false);
+  });
+});
+
+describe('senderOf', () => {
+  it('returns the webContents that sent an IPC event and its id', () => {
+    const wc = makeWebContents();
+
+    expect(senderOf({ sender: wc })).toEqual({ sender: wc, senderId: wc.id });
+  });
+
+  it('returns nulls when the event has no sender', () => {
+    expect(senderOf(undefined)).toEqual({ sender: null, senderId: null });
+    expect(senderOf({})).toEqual({ sender: null, senderId: null });
   });
 });
 
