@@ -1,5 +1,8 @@
 import { BaseComponent } from '../base/BaseComponent.js';
-import { getWaveformColors } from '../utils/waveformColors.js';
+import { DARK_MODE, LIGHT_MODE, getWaveformColors } from '../utils/waveformColors.js';
+
+// Tailwind's dark-mode class, toggled on <html> by SystemThemeWatcher.
+const DARK_THEME_CLASS = 'dark';
 
 /**
  * Reusable waveform preview built on the third-party WaveformPlayer.
@@ -256,7 +259,7 @@ export class WaveformPreview extends BaseComponent {
 
   /** Fallback for a player created before the first theme event arrived. */
   static _readDocumentThemeMode() {
-    const isDark = !!globalThis.document?.documentElement?.classList?.contains('dark');
-    return isDark ? 'dark' : 'light';
+    const isDark = !!globalThis.document?.documentElement?.classList?.contains(DARK_THEME_CLASS);
+    return isDark ? DARK_MODE : LIGHT_MODE;
   }
 }

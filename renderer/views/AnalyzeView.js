@@ -107,8 +107,8 @@ export class AnalyzeView extends BaseComponent {
 
   /**
    * Forward the underlying audio element's play/pause/ended events to a
-   * callback. Delegates to WaveformPreview, which handles re-attaching after
-   * theme rebuilds (which recreate the audio element).
+   * callback. Delegates to WaveformPreview, which keeps the same audio
+   * element across theme changes (the waveform is repainted in place).
    */
   onPlaybackStateChange(cb) {
     this._preview.setOnPlaybackStateChange(cb);

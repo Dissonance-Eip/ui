@@ -1,16 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createRequire } from 'node:module';
+import { createThemeForwarder } from '../ipcHandlers/theme/themeForwarder.js';
+import { makeBrowserWindowClass, makeWebContents } from './helpers/fakeElectron.js';
 
-const require = createRequire(import.meta.url);
-const { createThemeForwarder } = require('../ipcHandlers/theme/themeForwarder.js');
-
-/** Helper: a minimal BrowserWindow stand-in recording what it was sent. */
-function makeWindow({ destroyed = false } = {}) {
-  return {
-    isDestroyed: vi.fn(() => destroyed),
-    webContents: { send: vi.fn() },
-  };
-}
+const THEME_CHANNEL = 'ui:systemTheme';
 
 /** Helper: resolver returning the given modes in order, one per call. */
 function resolverReturning(...modes) {
@@ -18,62 +10,84 @@ function resolverReturning(...modes) {
   return vi.fn(async () => queue.shift());
 }
 
+function setup({ windowCount = 1, modes = ['dark'] } = {}) {
+  const BrowserWindow = makeBrowserWindowClass();
+  const windows = Array.from({ length: windowCount }, () => new BrowserWindow());
+  const forward = createThemeForwarder({
+    getWindows: () => BrowserWindow.getAllWindows(),
+    resolveMode: resolverReturning(...modes),
+  });
+  return { BrowserWindow, windows, forward };
+}
+
+const themeMessagesTo = (win) =>
+  win.webContents.send.mock.calls.filter(([channel]) => channel === THEME_CHANNEL);
+
 describe('createThemeForwarder', () => {
-  it('sends the resolved mode over ui:systemTheme', async () => {
-    const win = makeWindow();
-    const forward = createThemeForwarder({
-      mainWindow: win,
-      resolveMode: resolverReturning('dark'),
-    });
+  it('sends the resolved mode to every open window', async () => {
+    const { windows, forward } = setup({ windowCount: 3 });
 
     await forward();
 
-    expect(win.webContents.send).toHaveBeenCalledWith('ui:systemTheme', { mode: 'dark' });
+    windows.forEach((win) =>
+      expect(win.webContents.send).toHaveBeenCalledWith(THEME_CHANNEL, { mode: 'dark' })
+    );
   });
 
   it('sends the same mode only once (several OS signals for one switch)', async () => {
-    const win = makeWindow();
-    const forward = createThemeForwarder({
-      mainWindow: win,
-      resolveMode: resolverReturning('dark', 'dark', 'dark'),
-    });
+    const { windows, forward } = setup({ modes: ['dark', 'dark', 'dark'] });
 
     await forward();
     await forward();
     await forward();
 
-    expect(win.webContents.send).toHaveBeenCalledTimes(1);
+    expect(themeMessagesTo(windows[0])).toHaveLength(1);
   });
 
   it('sends again when the mode changes', async () => {
-    const win = makeWindow();
-    const forward = createThemeForwarder({
-      mainWindow: win,
-      resolveMode: resolverReturning('dark', 'light'),
-    });
+    const { windows, forward } = setup({ modes: ['dark', 'light'] });
 
     await forward();
     await forward();
 
-    expect(win.webContents.send.mock.calls.map(([, data]) => data.mode)).toEqual(['dark', 'light']);
+    expect(themeMessagesTo(windows[0]).map(([, data]) => data.mode)).toEqual(['dark', 'light']);
   });
 
-  it('sends nothing to a destroyed or missing window', async () => {
-    const destroyed = makeWindow({ destroyed: true });
-    await createThemeForwarder({ mainWindow: destroyed, resolveMode: resolverReturning('dark') })();
-    await createThemeForwarder({ mainWindow: null, resolveMode: resolverReturning('dark') })();
+  it('skips closed windows and still reaches the others', async () => {
+    const { windows, forward } = setup({ windowCount: 2 });
+    windows[0].close();
 
-    expect(destroyed.webContents.send).not.toHaveBeenCalled();
+    await forward();
+
+    expect(themeMessagesTo(windows[0])).toHaveLength(0);
+    expect(themeMessagesTo(windows[1])).toHaveLength(1);
+  });
+
+  it('skips a window whose renderer is already destroyed', async () => {
+    const { windows, forward } = setup({ windowCount: 2 });
+    windows[0].webContents = makeWebContents({ destroyed: true });
+
+    await forward();
+
+    expect(windows[0].webContents.send).not.toHaveBeenCalled();
+    expect(themeMessagesTo(windows[1])).toHaveLength(1);
   });
 
   it('does not throw when the mode cannot be resolved', async () => {
-    const win = makeWindow();
-    const resolveMode = vi.fn(async () => {
-      throw new Error('gsettings exploded');
+    const BrowserWindow = makeBrowserWindowClass();
+    const win = new BrowserWindow();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const forward = createThemeForwarder({
+      getWindows: () => BrowserWindow.getAllWindows(),
+      resolveMode: vi.fn(async () => {
+        throw new Error('gsettings exploded');
+      }),
     });
-    const forward = createThemeForwarder({ mainWindow: win, resolveMode });
 
     await expect(forward()).resolves.toBeUndefined();
+
     expect(win.webContents.send).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 });

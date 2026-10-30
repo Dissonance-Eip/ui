@@ -2,8 +2,8 @@
  * Bridges the OS-level dark/light preference into the renderer.
  * On start(): asks main for the current mode, then subscribes for updates.
  * Toggles the `dark` class on <html> (Tailwind variant) and dispatches a
- * `dissonance:theme` window event so WaveformPreview can rebuild its
- * canvas with theme-appropriate colours.
+ * `dissonance:theme` window event so WaveformPreview can repaint its
+ * canvas in place with theme-appropriate colours (playback continues).
  */
 export class SystemThemeWatcher {
   constructor({ api, rootEl } = {}) {

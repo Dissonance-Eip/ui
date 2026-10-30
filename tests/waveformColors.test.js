@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWaveformColors } from '../renderer/utils/waveformColors.js';
+import { DARK_MODE, LIGHT_MODE, getWaveformColors } from '../renderer/utils/waveformColors.js';
 
 describe('getWaveformColors', () => {
   it('returns light-on-dark colours for the dark theme', () => {
@@ -27,5 +27,11 @@ describe('getWaveformColors', () => {
     const colors = getWaveformColors('dark');
     colors.waveformColor = 'red';
     expect(getWaveformColors('dark').waveformColor).toBe('rgba(226, 232, 240, 0.30)');
+  });
+
+  it('exports the mode names shared with the renderer theme event', () => {
+    expect(DARK_MODE).toBe('dark');
+    expect(LIGHT_MODE).toBe('light');
+    expect(getWaveformColors(DARK_MODE)).toEqual(getWaveformColors('dark'));
   });
 });

@@ -1,29 +1,33 @@
 /**
- * Pushes the OS theme to the renderer over `ui:systemTheme`.
+ * Pushes the OS theme to every open window over `ui:systemTheme`.
  *
  * Several signals can fire for one theme switch (nativeTheme 'updated' plus
  * one or more gsettings monitors on Linux), so only actual mode changes are
- * sent. `resolveMode` is injected to keep this free of the `electron` import.
+ * sent. `getWindows` and `resolveMode` are injected to keep this free of the
+ * `electron` import; delivery goes through the shared sendToRenderer().
  */
+const { sendToRenderer } = require('../rendererMessaging');
+
 const SYSTEM_THEME_CHANNEL = 'ui:systemTheme';
 
 /**
- * @param {{ mainWindow: object | null, resolveMode: () => Promise<string> }} deps
- * @returns {() => Promise<void>} call on every OS theme signal; never throws.
+ * @param {{ getWindows: () => object[], resolveMode: () => Promise<string> }} deps
+ * @returns {() => Promise<void>} call on every OS theme signal; never rejects.
  */
-function createThemeForwarder({ mainWindow, resolveMode }) {
+function createThemeForwarder({ getWindows, resolveMode }) {
   let lastSentMode = null;
   return async () => {
+    let mode;
     try {
-      const mode = await resolveMode();
-      if (mode === lastSentMode) return;
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      lastSentMode = mode;
-      mainWindow.webContents.send(SYSTEM_THEME_CHANNEL, { mode });
-    } catch (_e) {
-      // ignore — theme is non-critical
+      mode = await resolveMode();
+    } catch (e) {
+      console.error('Failed to resolve the system theme', e);
+      return;
     }
+    if (mode === lastSentMode) return;
+    lastSentMode = mode;
+    getWindows().forEach((win) => sendToRenderer(win.webContents, SYSTEM_THEME_CHANNEL, { mode }));
   };
 }
 
-module.exports = { createThemeForwarder };
+module.exports = { createThemeForwarder, SYSTEM_THEME_CHANNEL };

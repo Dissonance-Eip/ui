@@ -3,15 +3,16 @@
  * WaveformPlayer on creation and re-applies them in place when the OS
  * theme changes, so the colours live in one place.
  */
-const DARK_MODE = 'dark';
+export const DARK_MODE = 'dark';
+export const LIGHT_MODE = 'light';
 
 const WAVEFORM_COLORS = Object.freeze({
-  dark: Object.freeze({
+  [DARK_MODE]: Object.freeze({
     waveformColor: 'rgba(226, 232, 240, 0.30)',
     progressColor: 'rgba(226, 232, 240, 0.95)',
     buttonColor: 'rgba(226, 232, 240, 0.95)',
   }),
-  light: Object.freeze({
+  [LIGHT_MODE]: Object.freeze({
     waveformColor: 'rgba(15, 23, 42, 0.25)',
     progressColor: 'rgba(15, 23, 42, 0.9)',
     buttonColor: 'rgba(15, 23, 42, 0.9)',
@@ -23,6 +24,6 @@ const WAVEFORM_COLORS = Object.freeze({
  * @returns {{ waveformColor: string, progressColor: string, buttonColor: string }}
  */
 export function getWaveformColors(mode) {
-  const palette = mode === DARK_MODE ? WAVEFORM_COLORS.dark : WAVEFORM_COLORS.light;
+  const palette = WAVEFORM_COLORS[mode === DARK_MODE ? DARK_MODE : LIGHT_MODE];
   return { ...palette };
 }
