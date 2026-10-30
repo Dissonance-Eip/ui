@@ -1,440 +1,151 @@
 /**
- * Top-level renderer controller — owns the four-view flow (upload / analyze /
- * processing / compare) and the TagWriteQueue. start() wires every event the
- * app reacts to:
+ * Top-level renderer controller: a thin coordinator that builds the
+ * renderer's flows and wires view, window and main-process events to them.
  *
- *   • upload / drop → importFile → analyze view
- *   • change file → re-open dialog → importFile
- *   • tag blur → enqueue write (queue defers while audio plays)
- *   • playback play/pause → toggle queue blocked state
- *   • process → processing view (dedicated loading screen) → flush queue →
- *     core processes → tag the output → populate + reveal compare view
- *     (or back to analyze on error)
- *   • export → copy temp to user location → reset to upload
- *   • restart (always-visible button, any screen) → flush + reset to upload,
- *     discarding any in-flight processing result via the operation id
- *   • quit/close flush request → pause, snapshot form, drain (preload answers main)
- *   • a tag snapshot is only saved once the form holds the file's tags, or
- *     after the user changed a field (see _formTagsToSave)
- *   • another window about to rewrite the shown file → pause its players
- *   • another window rewrote the shown file → save own edits, re-read tags,
- *     reload the players (the audio data may have moved in the file)
+ *   • TagEditSession   — tag auto-save queue, form fill (#111), pause + flush
+ *   • ScreenNavigator  — upload / analyze / processing / compare, header, buttons
+ *   • FileImportFlow   — upload, change file, drop anywhere → Analyze + metadata
+ *   • ProcessingFlow   — process → Compare, export, restart, operation id
  *
- * Compare's content is only populated once the processing screen is showing
- * — never while `#view-compare` itself is hidden — so the waveform players
- * inside it always initialize against a laid-out, visible container.
- *
- * _pauseAndFlushTags() is the single chokepoint used by importFile,
- * processCurrentFile, and the quit handler; see its comment.
+ * Also handles the multi-window events: another window about to rewrite the
+ * shown file → pause its players; another window rewrote it → save own
+ * edits, re-read tags, reload the players (the audio data may have moved).
+ * The quit/close flush request pauses playback and drains the tag queue; the
+ * preload answers main once that settles.
  */
 import { BaseController } from '../base/BaseController.js';
-import { TagWriteQueue } from '../services/TagWriteQueue.js';
-import { buildProcessingOptions } from '../utils/processingOptions.js';
-
-const asText = (value) => (value == null ? '' : String(value));
+import { FileImportFlow } from './FileImportFlow.js';
+import { ProcessingFlow } from './ProcessingFlow.js';
+import { ScreenNavigator } from './ScreenNavigator.js';
+import { TagEditSession } from './TagEditSession.js';
 
 export class AppController extends BaseController {
-  constructor({
-    api,
-    logger,
-    router,
-    state,
-    uploadView,
-    analyzeView,
-    compareView,
-    headerEl,
-    restartBtn,
-    wavMetadataService,
-  }) {
+  /**
+   * @param {object} deps the views, api, logger, router, state, headerEl,
+   *   restartBtn and wavMetadataService built by bootstrap.js.
+   *   eventTarget — where window-level drops are caught (default `window`).
+   */
+  constructor(deps) {
     super();
-    this.api = api;
-    this.logger = logger;
-    this.router = router;
-    this.state = state;
-    this.uploadView = uploadView;
-    this.analyzeView = analyzeView;
-    this.compareView = compareView;
-    this.headerEl = headerEl;
-    this.restartBtn = restartBtn;
-    this.wavMetadataService = wavMetadataService;
+    this.api = deps.api;
+    this.logger = deps.logger;
+    this.state = deps.state;
+    this.uploadView = deps.uploadView;
+    this.analyzeView = deps.analyzeView;
+    this.compareView = deps.compareView;
+    this.restartBtn = deps.restartBtn;
+    this.eventTarget = deps.eventTarget;
 
-    this._originalBasicInfo = null;
-    this._processedBasicInfo = null;
-
-    // Bumped on every processCurrentFile() call and on restart(); a
-    // processCurrentFile() run checks this after each await and bails if it
-    // no longer matches, so a restart mid-processing can't have its (now
-    // irrelevant) result land on top of the reset UI. The in-flight core
-    // call itself isn't cancelled — there's no cancellation IPC — this just
-    // makes the renderer ignore the stale result when it eventually arrives.
-    this._activeOperationId = 0;
-
-    // Bumped on every metadata read; a reply whose id no longer matches (the
-    // user imported another file meanwhile) is dropped instead of filling
-    // the form with the wrong file's tags.
-    this._metadataReadId = 0;
-
-    // What the controller last put into the tag form:
-    //   { filePath, loaded, tags } — loaded is true once the file's own tags
-    //   were read into it. null when no file is shown.
-    this._formFill = null;
-
-    // Serialised, blockable queue for auto-saving tag edits. Blocked while
-    // the audio element is streaming a file; flushed on quit.
-    this._tagQueue = new TagWriteQueue({
-      writeFn: (filePath, tags) => this.api.writeTags(filePath, tags),
-      onError: (err) => this.logger?.log?.(`Auto-save tags failed: ${err}`),
+    this.screens = new ScreenNavigator(deps);
+    this.tags = new TagEditSession({
+      ...deps,
+      pausePreviews: () => this.screens.pauseAllPreviews(),
     });
-
-    this._onGlobalDragOver = this._onGlobalDragOver.bind(this);
-    this._onGlobalDrop = this._onGlobalDrop.bind(this);
+    this.processing = new ProcessingFlow({
+      ...deps,
+      tags: this.tags,
+      screens: this.screens,
+      getOriginalInfo: () => this.importer.originalInfo,
+      resetToUpload: () => this._resetToUpload(),
+    });
+    this.importer = new FileImportFlow({
+      ...deps,
+      tags: this.tags,
+      screens: this.screens,
+      discardProcessedFile: () => this.processing.discardProcessedFile(),
+    });
   }
 
   start() {
     super.start();
-    this.uploadView.mount();
-    this.track(() => this.uploadView.unmount());
+    this._mountViews();
+    this.screens.showUpload();
+    this._wireImport();
+    this._wireTags();
+    this._wireProcessing();
+    this._wireAppEvents();
+    this.screens.syncButtons();
+    this.logger?.setStatus?.('Ready');
+  }
 
-    this.analyzeView.mount();
-    this.track(() => this.analyzeView.unmount());
+  _mountViews() {
+    for (const view of [this.uploadView, this.analyzeView, this.compareView]) {
+      view.mount();
+      this.track(() => view.unmount());
+    }
+  }
 
-    this.compareView.mount();
-    this.track(() => this.compareView.unmount());
-
-    this.router.show('upload');
-    this._setHeaderVisible(true);
-
+  _wireImport() {
     this.uploadView.onFileImported((filePath, sourceLabel) => {
       this.importFile(filePath, sourceLabel);
     });
+    this.analyzeView.onChangeFile(() => this.importer.changeFile());
 
-    this.analyzeView.onChangeFile(async () => {
-      try {
-        this.logger?.setStatus?.('Opening file dialog...');
-        const filePath = await this.api.openFile(this.state.lastImportedFilePath);
-        if (!filePath) {
-          this.logger?.log?.('No file selected');
-          this.logger?.setStatus?.('Import canceled');
-          return;
-        }
-        this.importFile(filePath, 'Selected');
-      } catch (err) {
-        this.logger?.error?.(`Import failed: ${err}`);
-      }
-    });
+    // Prevent the browser/Electron from navigating to the dropped file.
+    const target = this.eventTarget ?? window;
+    const onDragOver = (e) => this.importer.handleWindowDragOver(e);
+    const onDrop = (e) => this.importer.handleWindowDrop(e);
+    target.addEventListener('dragover', onDragOver);
+    target.addEventListener('drop', onDrop);
+    this.track(() => target.removeEventListener('dragover', onDragOver));
+    this.track(() => target.removeEventListener('drop', onDrop));
+  }
 
+  _wireTags() {
+    // Each blur snapshots the form into the queue, which defers the write
+    // while audio plays and serialises writes so they can't corrupt the file.
+    this.analyzeView.onTagBlur((tags) => this.tags.saveBlurredForm(tags));
+    this.analyzeView.onPlaybackStateChange((isPlaying) => this.tags.setPlaying(isPlaying));
+  }
+
+  _wireProcessing() {
     this.analyzeView.onProcess(() => this.processCurrentFile());
-
-    // Each blur snapshots the current tags + file path into the queue.
-    // The queue defers the write while audio is playing (see below) and
-    // serialises writes so concurrent calls can't corrupt the file.
-    this.analyzeView.onTagBlur((tags) => {
-      const filePath = this.state.currentFilePath;
-      const toSave = this._tagsToSave(filePath, tags);
-      if (toSave) this._tagQueue.enqueue(filePath, toSave);
-    });
-
-    // Block the queue while audio is playing, unblock on pause/end so any
-    // queued snapshot flushes immediately when the user stops playback.
-    this.analyzeView.onPlaybackStateChange((isPlaying) => {
-      this._tagQueue.setBlocked(isPlaying);
-    });
-
     this.compareView.onExport(() => this.exportProcessedFile());
+    if (!this.restartBtn) return;
+    const onRestart = () => this.restart();
+    this.restartBtn.addEventListener('click', onRestart);
+    this.track(() => this.restartBtn.removeEventListener('click', onRestart));
+  }
 
-    if (this.restartBtn) {
-      const onRestart = () => this.restart();
-      this.restartBtn.addEventListener('click', onRestart);
-      this.track(() => this.restartBtn.removeEventListener('click', onRestart));
-    }
-
-    // Before this window closes or the app quits: pause playback and drain
-    // the queue. The preload tells main once this promise settles.
-    window.dissonance.onAppFlushRequest(() => this._pauseAndFlushTags());
-
+  _wireAppEvents() {
+    // Before this window closes or the app quits: pause playback and drain the queue.
+    this.track(this.api.onAppFlushRequest(() => this._pauseAndFlushTags()));
     // Another window is rewriting the tags of a file (see TagWriteCoordinator).
     this.track(this.api.onPauseFileRequest((request) => this.pauseIfShowing(request?.filePath)));
     this.track(
       this.api.onTagsWrittenElsewhere((event) => this.refreshAfterWriteElsewhere(event?.filePath))
     );
-
-    // Prevent the browser/Electron from navigating to the dropped file.
-    window.addEventListener('dragover', this._onGlobalDragOver);
-    window.addEventListener('drop', this._onGlobalDrop);
-    this.track(() => window.removeEventListener('dragover', this._onGlobalDragOver));
-    this.track(() => window.removeEventListener('drop', this._onGlobalDrop));
-
-    // Listen for core status events from main via preload bridge
-    const unsubscribe = this.api.onCoreStatus((data) => {
-      const msg = data && data.message ? data.message : JSON.stringify(data);
-      this.logger?.log?.(`core:status — ${msg}`);
-    });
-    if (typeof unsubscribe === 'function') {
-      this.track(unsubscribe);
-    }
-
-    this._syncButtons();
-    this.logger?.setStatus?.('Ready');
-  }
-
-  /**
-   * Handle a new source file selected by the user (dropped or picked).
-   * @param {string} filePath       absolute path of the WAV
-   * @param {string} sourceLabel    'Dropped' or 'Selected' — for logging only
-   */
-  async importFile(filePath, sourceLabel) {
-    // Capture any tag edits for the OLD file and flush them safely before we
-    // touch anything. Also waits for in-flight writes so readMetadata below
-    // sees fresh values (matters when reimporting the same file).
-    await this._pauseAndFlushTags();
-
-    if (this.state.processedFilePath) {
-      // Best-effort cleanup of the previous processed temp file.
-      this.api.cleanupProcessedFile(this.state.processedFilePath).catch(() => {});
-    }
-
-    this.state.setCurrentFilePath(filePath);
-    this._originalBasicInfo = this.wavMetadataService.toBasicInfo(filePath, null);
-    this._processedBasicInfo = null;
-    this._formFill = Object.freeze({ filePath, loaded: false, tags: this._originalBasicInfo.tags });
-
-    this.compareView.clearAudioPreviews?.();
-
-    this.analyzeView.setSelectedFile(filePath);
-    this.analyzeView.setBasicWavInfo(this._originalBasicInfo);
-    this.analyzeView.setAudioPreviewFile(filePath);
-    this.analyzeView.setProcessEnabled(true);
-
-    this.logger?.log?.(`${sourceLabel} file: ${filePath}`);
-    this.logger?.setStatus?.('File imported');
-
-    this._showAnalyze();
-
-    // Read WAV metadata immediately so the user can view and edit fields before processing.
-    this._readFileMetadata(filePath);
-  }
-
-  async _readFileMetadata(filePath) {
-    if (!filePath) return;
-    const readId = ++this._metadataReadId;
-    try {
-      this.logger?.setStatus?.('Reading metadata…');
-      const resp = await this.api.readFileMetadata(filePath);
-      if (!this._isCurrentRead(readId, filePath)) {
-        this.logger?.log?.(`Ignoring metadata for ${filePath} — another file is shown now`);
-        return;
-      }
-      if (resp && resp.ok && resp.audio) {
-        this._originalBasicInfo = this.wavMetadataService.toBasicInfoFromMetadata(filePath, resp);
-        this.analyzeView.setBasicWavInfo(this._originalBasicInfo);
-        this._formFill = Object.freeze({
-          filePath,
-          loaded: true,
-          tags: this._originalBasicInfo.tags,
-        });
-        this.logger?.setStatus?.('Ready');
-        return;
-      }
-      const errMsg = resp && resp.error ? resp.error : 'Unknown error';
-      this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
-    } catch (err) {
-      if (!this._isCurrentRead(readId, filePath)) return;
-      this.logger?.error?.(`Metadata failed: ${err}`);
-    }
-  }
-
-  _isCurrentRead(readId, filePath) {
-    return readId === this._metadataReadId && filePath === this.state.currentFilePath;
-  }
-
-  async processCurrentFile() {
-    if (!this.state.currentFilePath) {
-      this.logger?.setStatus?.('No file to process', true);
-      return;
-    }
-
-    const modes = this.analyzeView.getProcessingModes?.() ?? [];
-    const options = buildProcessingOptions(modes);
-    if (!options) {
-      this.logger?.setStatus?.('Select at least one processing mode');
-      return;
-    }
-
-    const operationId = ++this._activeOperationId;
-
-    try {
-      this.logger?.setStatus?.('Processing...');
-      this.logger?.log?.('Sending processing request to dissonance-core');
-
-      // Navigate to a dedicated loading screen immediately instead of making
-      // the user wait on Analyze — the core call below can take a few
-      // seconds and staring at an unchanged screen feels broken. Compare
-      // itself isn't shown until its content is populated below, so the
-      // waveform players never initialize against a hidden (zero-size)
-      // container.
-      this._showProcessing();
-
-      // Pause playback + capture any unsaved tag edits + drain the queue
-      // before the core reads the input file.
-      await this._pauseAndFlushTags();
-
-      const resp = await this.api.processFile(this.state.currentFilePath, options);
-
-      if (operationId !== this._activeOperationId) {
-        // The app was restarted while this request was in flight — the core
-        // can't be cancelled mid-run, so just ignore the now-stale result.
-        this.logger?.log?.('Discarding processing result — app was restarted');
-        return;
-      }
-
-      if (resp && resp.ok && resp.processedPath) {
-        // Write the user's edited metadata tags into the processed file.
-        const editedTags = this._formTagsToSave();
-        if (editedTags) this._tagQueue.enqueue(resp.processedPath, editedTags);
-        await this._tagQueue.flush();
-
-        this.state.setProcessedFilePath(resp.processedPath);
-
-        const processedMeta = await this.api.readFileMetadata(resp.processedPath).catch(() => null);
-        this._processedBasicInfo = this.wavMetadataService.toBasicInfoFromMetadata(
-          resp.processedPath,
-          processedMeta && processedMeta.ok ? processedMeta : {}
-        );
-
-        this.compareView.setOriginalInfo(this._originalBasicInfo);
-        this.compareView.setProcessedInfo(this._processedBasicInfo);
-        this.compareView.setAudioPreviewFiles?.({
-          originalPath: this.state.currentFilePath,
-          processedPath: this.state.processedFilePath,
-        });
-        this.compareView.setExportEnabled(true);
-
-        this.logger?.setStatus?.('Processed');
-        this.logger?.log?.(`Processing complete: ${resp.processedPath}`);
-        this._syncButtons();
-
-        this._showCompare();
-        return;
-      }
-
-      const errMsg = resp && resp.error ? resp.error : 'Unknown error';
-      this.logger?.setStatus?.(`Processing failed: ${errMsg}`, true);
-      this.logger?.log?.(`Processing failed: ${errMsg}`);
-      this._showAnalyze();
-    } catch (err) {
-      if (operationId !== this._activeOperationId) return; // restarted mid-flight; ignore
-      this.logger?.error?.(`Processing failed: ${err}`);
-      this._showAnalyze();
-    }
-  }
-
-  async exportProcessedFile() {
-    if (!this.state.processedFilePath) {
-      this.logger?.setStatus?.('No processed file to export', true);
-      return;
-    }
-
-    try {
-      this.logger?.setStatus?.('Exporting...');
-      this.logger?.log?.('Triggering export dialog');
-
-      const resp = await this.api.exportFile(this.state.processedFilePath);
-      if (resp && resp.ok && resp.exportedPath) {
-        // After export, the main process cleans up the temp processed file.
-        this.state.setProcessedFilePath(null);
-        this._syncButtons();
-        this.logger?.setStatus?.('Exported');
-        this.logger?.log?.(`Exported to: ${resp.exportedPath}`);
-
-        this._resetToUpload();
-        return;
-      }
-
-      const errMsg = resp && resp.error ? resp.error : 'Unknown error';
-      this.logger?.setStatus?.(`Export failed: ${errMsg}`, true);
-      this.logger?.log?.(`Export failed: ${errMsg}`);
-    } catch (err) {
-      this.logger?.error?.(`Export failed: ${err}`);
-    }
-  }
-
-  /**
-   * Abandon whatever's in progress and go back to Upload, from any screen.
-   * Doesn't cancel an in-flight core call (no cancellation IPC exists) —
-   * invalidating the operation id just makes processCurrentFile() discard
-   * that result when it eventually arrives instead of acting on it.
-   */
-  async restart() {
-    this._activeOperationId++;
-    this.logger?.log?.('Restarting');
-
-    await this._pauseAndFlushTags().catch(() => {});
-
-    if (this.state.processedFilePath) {
-      this.api.cleanupProcessedFile(this.state.processedFilePath).catch(() => {});
-    }
-
-    this._resetToUpload();
-    this.logger?.setStatus?.('Ready');
-  }
-
-  _syncButtons() {
-    this.analyzeView.setProcessEnabled(this.state.hasCurrentFile());
-    this.compareView.setExportEnabled(this.state.hasProcessedFile());
-  }
-
-  /**
-   * Safe-flush the tag queue:
-   *   1. Pause every audio preview (analyze + both compare players) so no
-   *      audio element is streaming the file we're about to rewrite.
-   *   2. Snapshot the current form into the queue for the current file path
-   *      so any tag edit that didn't fire blur (native dialog stealing focus,
-   *      Cmd+Q with focus in an input, clicking Process from an input, etc.)
-   *      is captured — unless the form is still empty because the file's
-   *      tags never loaded and the user typed nothing (#111).
-   *   3. Await the queue draining all pending + in-flight writes.
-   *
-   * Called from importFile, processCurrentFile, and the quit flush handler.
-   */
-  async _pauseAndFlushTags() {
-    this._pauseAllPreviews();
-
-    const tags = this._formTagsToSave();
-    if (tags) this._tagQueue.enqueue(this.state.currentFilePath, tags);
-
-    await this._tagQueue.flush();
-  }
-
-  /** @returns {object|null} what to save from the form for the current file, or null for nothing */
-  _formTagsToSave() {
-    const filePath = this.state.currentFilePath;
-    if (!filePath) return null;
-    return this._tagsToSave(filePath, this.analyzeView.getMetadataTags());
-  }
-
-  /**
-   * Once the form holds `filePath`'s own tags, the whole snapshot is saved
-   * (main writes only what differs from what this window read). Before that
-   * — read pending or failed — the form is an empty placeholder: only the
-   * fields the user actually changed are saved, so the empty ones can never
-   * wipe the file's tags. Nothing changed → null, no write.
-   * @returns {object|null}
-   */
-  _tagsToSave(filePath, tags) {
-    if (!filePath) return null;
-    const fill = this._formFill && this._formFill.filePath === filePath ? this._formFill : null;
-    if (fill && fill.loaded) return tags;
-    const shown = fill ? fill.tags : {};
-    const edited = Object.entries(tags || {}).filter(
-      ([name, value]) => asText(value) !== asText(shown[name])
+    this.track(
+      this.api.onCoreStatus((data) => {
+        const msg = data && data.message ? data.message : JSON.stringify(data);
+        this.logger?.log?.(`core:status — ${msg}`);
+      })
     );
-    return edited.length > 0 ? Object.fromEntries(edited) : null;
   }
 
-  /** Pause every audio preview in this window (analyze + both compare players). */
-  _pauseAllPreviews() {
-    this.analyzeView.pauseAudioPreview();
-    this.compareView.pauseAudioPreviews?.();
+  importFile(filePath, sourceLabel) {
+    return this.importer.importFile(filePath, sourceLabel);
+  }
+
+  processCurrentFile() {
+    return this.processing.process();
+  }
+
+  exportProcessedFile() {
+    return this.processing.exportResult();
+  }
+
+  restart() {
+    return this.processing.restart();
+  }
+
+  /** The one tag-flush chokepoint; see TagEditSession.pauseAndFlush. */
+  _pauseAndFlushTags() {
+    return this.tags.pauseAndFlush();
+  }
+
+  _readFileMetadata(filePath) {
+    return this.importer.readFileMetadata(filePath);
   }
 
   /**
@@ -445,7 +156,7 @@ export class AppController extends BaseController {
    */
   pauseIfShowing(filePath) {
     if (!filePath || filePath !== this.state.currentFilePath) return;
-    this._pauseAllPreviews();
+    this.screens.pauseAllPreviews();
   }
 
   /**
@@ -465,63 +176,12 @@ export class AppController extends BaseController {
     }
   }
 
-  _showAnalyze() {
-    this.router.show('analyze');
-    this._setHeaderVisible(false);
-    this._syncButtons();
-  }
-
-  _showCompare() {
-    this.analyzeView.pauseAudioPreview();
-    this.router.show('compare');
-    this._setHeaderVisible(false);
-    this._syncButtons();
-  }
-
-  _showProcessing() {
-    this.analyzeView.pauseAudioPreview();
-    this.router.show('processing');
-    this._setHeaderVisible(false);
-  }
-
   _resetToUpload() {
-    this._pauseAllPreviews();
+    this.screens.pauseAllPreviews();
     this.state.setCurrentFilePath(null);
-    this._formFill = null;
-    this._originalBasicInfo = null;
-    this._processedBasicInfo = null;
-    this.analyzeView.setSelectedFile(null);
-    this.analyzeView.setBasicWavInfo(null);
-    this.analyzeView.clearAudioPreview();
-    this.compareView.setOriginalInfo(null);
-    this.compareView.setProcessedInfo(null);
-    this.compareView.clearAudioPreviews?.();
-    this.router.show('upload');
-    this._setHeaderVisible(true);
-    this._syncButtons();
-  }
-
-  _setHeaderVisible(visible) {
-    if (!this.headerEl) return;
-    this.headerEl.hidden = !visible;
-  }
-
-  _onGlobalDragOver(e) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-  }
-
-  _onGlobalDrop(e) {
-    e.preventDefault();
-
-    // Allow dropping anywhere in the window (useful after you are on the main view).
-    const dt = e.dataTransfer;
-    if (!dt || !dt.files || dt.files.length === 0) return;
-
-    const file = dt.files[0];
-    const filePath = this.api?.getPathForFile ? this.api.getPathForFile(file) : file.path || null;
-    if (!filePath) return;
-
-    this.importFile(filePath, 'Dropped');
+    this.tags.clearFormFill();
+    this.importer.clear();
+    this.screens.clearFileScreens();
+    this.screens.showUpload();
   }
 }

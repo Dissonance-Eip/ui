@@ -103,6 +103,25 @@ describe('AppController.start', () => {
   });
 });
 
+describe('AppController — quit flush subscription (#114)', () => {
+  it('subscribes through DissonanceApi', () => {
+    const onAppFlushRequest = vi.spyOn(DissonanceApi.prototype, 'onAppFlushRequest');
+
+    startApp();
+
+    expect(onAppFlushRequest).toHaveBeenCalledTimes(1);
+    onAppFlushRequest.mockRestore();
+  });
+
+  it('is dropped on stop()', () => {
+    const app = startApp();
+
+    app.controller.stop();
+
+    expect(app.bridge.unsubscribes.onAppFlushRequest).toHaveBeenCalled();
+  });
+});
+
 describe('AppController — import flow', () => {
   it('a file from the upload view is shown on Analyze and its tags are read into the form', async () => {
     const app = startApp();

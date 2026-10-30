@@ -43,6 +43,11 @@ export class DissonanceApi extends BaseApi {
     return this._call('onCoreStatus', cb);
   }
 
+  /** Main asks this window to save its tag edits before it closes or quits. */
+  onAppFlushRequest(cb) {
+    return this._call('onAppFlushRequest', cb);
+  }
+
   onSystemTheme(cb) {
     return this._call('onSystemTheme', cb);
   }

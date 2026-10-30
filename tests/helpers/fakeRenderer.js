@@ -155,3 +155,30 @@ export function makeDragEvent(files = []) {
     stopPropagation: vi.fn(),
   };
 }
+
+/** A ScreenNavigator double: every method is a spy. */
+export function makeScreens() {
+  return {
+    showAnalyze: vi.fn(),
+    showProcessing: vi.fn(),
+    showCompare: vi.fn(),
+    showUpload: vi.fn(),
+    clearFileScreens: vi.fn(),
+    pauseAllPreviews: vi.fn(),
+    syncButtons: vi.fn(),
+    setHeaderVisible: vi.fn(),
+  };
+}
+
+/** A TagEditSession double whose flushes resolve at once. */
+export function makeTagSession() {
+  return {
+    setFormFill: vi.fn(),
+    clearFormFill: vi.fn(),
+    saveBlurredForm: vi.fn(),
+    setPlaying: vi.fn(),
+    copyFormTo: vi.fn(),
+    flush: vi.fn(async () => {}),
+    pauseAndFlush: vi.fn(async () => {}),
+  };
+}
