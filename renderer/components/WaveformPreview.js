@@ -1,6 +1,7 @@
 import { BaseComponent } from '../base/BaseComponent.js';
 import { DARK_MODE, LIGHT_MODE, getWaveformColors } from '../utils/waveformColors.js';
 import { toFileUrl } from '../utils/fileUrl.js';
+import { TerminalLogger } from '../infrastructure/TerminalLogger.js';
 
 // Tailwind's dark-mode class, toggled on <html> by SystemThemeWatcher.
 const DARK_THEME_CLASS = 'dark';
@@ -17,10 +18,18 @@ const DARK_THEME_CLASS = 'dark';
  *   - Audio play/pause/ended event forwarding via onPlaybackStateChange
  *
  * Used by AnalyzeView (one instance) and CompareView (two instances).
+ * Player errors are logged (through the preload bridge when present) and
+ * never thrown: a broken preview must not break the screen around it.
  */
 export class WaveformPreview extends BaseComponent {
-  constructor({ containerEl, height = 164, onPlaybackStateChange = null } = {}) {
+  constructor({
+    containerEl,
+    height = 164,
+    onPlaybackStateChange = null,
+    logger = new TerminalLogger(globalThis.window?.dissonance),
+  } = {}) {
     super();
+    this.logger = logger;
     this.containerEl = containerEl;
     this.height = height;
     this._onPlaybackStateChange = onPlaybackStateChange;
@@ -113,7 +122,9 @@ export class WaveformPreview extends BaseComponent {
   pause() {
     try {
       this._player?.pause?.();
-    } catch (_e) {}
+    } catch (e) {
+      this._logError('pause the player', e);
+    }
   }
 
   clear() {
@@ -122,7 +133,9 @@ export class WaveformPreview extends BaseComponent {
     try {
       this._player?.pause?.();
       this._player?.destroy?.();
-    } catch (_e) {}
+    } catch (e) {
+      this._logError('destroy the player', e);
+    }
     this._player = null;
     if (this.containerEl) this.containerEl.innerHTML = '';
   }
@@ -154,7 +167,9 @@ export class WaveformPreview extends BaseComponent {
   _detachAudioListeners() {
     try {
       this._removeAudioListeners?.();
-    } catch (_e) {}
+    } catch (e) {
+      this._logError('detach the audio listeners', e);
+    }
     this._removeAudioListeners = null;
     this._listenersAttachedTo = null;
   }
@@ -213,7 +228,9 @@ export class WaveformPreview extends BaseComponent {
   _detachDragScrub() {
     try {
       this._removeDragScrub?.();
-    } catch (_e) {}
+    } catch (e) {
+      this._logError('detach drag-to-scrub', e);
+    }
     this._removeDragScrub = null;
     this._dragAttachedTo = null;
   }
@@ -241,9 +258,13 @@ export class WaveformPreview extends BaseComponent {
         buttonStyle.color = colors.buttonColor;
       }
       player.drawWaveform?.();
-    } catch (_e) {
-      // ignore — cosmetic only
+    } catch (e) {
+      this._logError('repaint the waveform', e);
     }
+  }
+
+  _logError(action, error) {
+    this.logger.error(`Waveform preview: could not ${action}: ${error}`);
   }
 
   /** Fallback for a player created before the first theme event arrived. */

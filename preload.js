@@ -16,7 +16,15 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // the literal.
 const IS_DEVELOPMENT = process.argv.includes('--dissonance-dev');
 
-console.log('Preload script loaded (ui/preload.js)');
+/**
+ * Logs through main's UiLogForwarder (the terminal), like the renderer's
+ * TerminalLogger; the sandboxed preload can't require main/logger.js.
+ */
+function logToMain(level, message) {
+  ipcRenderer.send('ui:log', { level, message: String(message) });
+}
+
+logToMain('log', 'Preload script loaded (ui/preload.js)');
 
 /**
  * Subscribe `cb` to a main → renderer request. Once `cb` settles, answer on
@@ -28,7 +36,7 @@ function answerRequests(requestChannel, doneChannel, cb) {
     try {
       await cb(request);
     } catch (e) {
-      console.error(`${requestChannel} handler failed`, e);
+      logToMain('error', `${requestChannel} handler failed: ${e && e.stack ? e.stack : e}`);
     } finally {
       ipcRenderer.send(doneChannel, { requestId: request && request.requestId });
     }
@@ -49,7 +57,8 @@ contextBridge.exposeInMainWorld('dissonance', {
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);
-    } catch (_e) {
+    } catch (e) {
+      logToMain('warn', `Could not resolve the dropped file's path: ${e}`);
       return null;
     }
   },
@@ -65,7 +74,7 @@ contextBridge.exposeInMainWorld('dissonance', {
       cb({ filePath: request && request.filePath })
     ),
   onTagsWrittenElsewhere: (cb) => subscribe('tags:writtenElsewhere', cb),
-  logToMain: (level, message) => ipcRenderer.send('ui:log', { level, message }),
+  logToMain,
   onCoreStatus: (cb) => subscribe('core:status', cb),
   onSystemTheme: (cb) => subscribe('ui:systemTheme', cb),
   isDevelopment: () => IS_DEVELOPMENT,

@@ -109,3 +109,37 @@ describe('WaveformPreview — file paths with URL-special characters (ui#113)', 
     expect(decodeURIComponent(url.pathname)).toBe(filePath);
   });
 });
+
+describe('WaveformPreview — player errors', () => {
+  it('logs a player that fails to pause instead of throwing', () => {
+    const logger = { log: vi.fn(), error: vi.fn(), setStatus: vi.fn() };
+    const preview = new WaveformPreview({ containerEl: {}, logger });
+    preview._player = {
+      pause: () => {
+        throw new Error('not ready');
+      },
+    };
+
+    expect(() => preview.pause()).not.toThrow();
+    expect(logger.error).toHaveBeenCalledWith(
+      'Waveform preview: could not pause the player: Error: not ready'
+    );
+  });
+
+  it('logs a failed repaint', () => {
+    const logger = { log: vi.fn(), error: vi.fn(), setStatus: vi.fn() };
+    const preview = new WaveformPreview({ containerEl: {}, logger });
+    preview._player = {
+      options: {},
+      drawWaveform: () => {
+        throw new Error('no canvas');
+      },
+    };
+
+    preview._onThemeChanged(themeEvent('dark'));
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Waveform preview: could not repaint the waveform: Error: no canvas'
+    );
+  });
+});

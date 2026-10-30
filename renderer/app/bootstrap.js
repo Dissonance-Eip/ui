@@ -39,7 +39,7 @@ export function bootstrap() {
   logger.log('dissonance API available from preload');
 
   // Watch OS-level light/dark mode and apply Tailwind `dark` class.
-  const themeWatcher = new SystemThemeWatcher({ api });
+  const themeWatcher = new SystemThemeWatcher({ api, logger });
   themeWatcher.start();
 
   const router = new ViewRouter({

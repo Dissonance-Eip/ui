@@ -17,13 +17,7 @@ export class BaseComponent extends Disposable {
   listen(el, eventName, handler, options) {
     if (!el || typeof el.addEventListener !== 'function') return null;
     el.addEventListener(eventName, handler, options);
-    this.track(() => {
-      try {
-        el.removeEventListener(eventName, handler, options);
-      } catch (_e) {
-        // ignore
-      }
-    });
+    this.track(() => el.removeEventListener(eventName, handler, options));
     return handler;
   }
 }
