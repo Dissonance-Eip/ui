@@ -13,6 +13,7 @@ import {
   PAUSE_FILE_REQUEST_CHANNEL,
   PAUSE_FILE_DONE_CHANNEL,
 } from '../ipcHandlers/core/OtherWindowsNotifier.js';
+import { secureWebPreferences } from '../main/windowSecurity.js';
 import { makeHandlingIpc } from './helpers/fakeElectron.js';
 
 const PRELOAD_PATH = fileURLToPath(new URL('../preload.js', import.meta.url));
@@ -22,8 +23,15 @@ const PRELOAD_PATH = fileURLToPath(new URL('../preload.js', import.meta.url));
  * exposes and fires every subscription, and records each channel by kind.
  * The sandboxed preload can't import ipcChannels.js, so this is what keeps
  * its string literals in step with the main side.
+ *
+ * The context gives preload the globals Electron's sandboxed preload has
+ * (`require` limited to electron, `console`, and a `process` whose argv
+ * carries webPreferences.additionalArguments), so preload code that is
+ * valid in the real sandbox runs here too.
+ *
+ * @param {{ argv?: string[] }} [opts] the renderer's process.argv
  */
-function recordPreloadChannels() {
+function recordPreloadChannels({ argv = [] } = {}) {
   const channels = { invoke: new Set(), send: new Set(), on: new Set() };
   const listeners = new Map();
   const ipcRenderer = {
@@ -44,10 +52,12 @@ function recordPreloadChannels() {
   const sandbox = {
     require: (id) => (id === 'electron' ? electron : undefined),
     console: { log() {}, error() {} },
+    process: { argv: [...argv] },
   };
   vm.runInNewContext(readFileSync(PRELOAD_PATH, 'utf8'), sandbox);
-  Object.values(api).forEach((method) => method(() => {}));
-  return { channels, listeners, ipcRenderer };
+  const exposed = api;
+  Object.values(exposed).forEach((method) => method(() => {}));
+  return { channels, listeners, ipcRenderer, api: exposed };
 }
 
 /** Registers every main-side IPC module on one fake ipcMain. */
@@ -116,4 +126,21 @@ describe('IPC contract between preload.js and the main process', () => {
 
     expect(ipcRenderer.send).toHaveBeenCalledWith(doneChannel, { requestId: 'r1' });
   });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'preload reads the dev flag main passes (isDevelopment %s → %s)',
+    (isDevelopment, expected) => {
+      const { additionalArguments } = secureWebPreferences({
+        preloadPath: PRELOAD_PATH,
+        isDevelopment,
+      });
+
+      const { api } = recordPreloadChannels({ argv: ['electron', ...additionalArguments] });
+
+      expect(api.isDevelopment()).toBe(expected);
+    }
+  );
 });
