@@ -29,9 +29,10 @@ const PRELOAD_PATH = fileURLToPath(new URL('../preload.js', import.meta.url));
  * carries webPreferences.additionalArguments), so preload code that is
  * valid in the real sandbox runs here too.
  *
- * @param {{ argv?: string[] }} [opts] the renderer's process.argv
+ * @param {{ argv?: string[], getPathForFile?: Function }} [opts] the
+ *   renderer's process.argv and the webUtils.getPathForFile double
  */
-function recordPreloadChannels({ argv = [] } = {}) {
+function recordPreloadChannels({ argv = [], getPathForFile = () => null } = {}) {
   const channels = { invoke: new Set(), send: new Set(), on: new Set() };
   const listeners = new Map();
   const ipcRenderer = {
@@ -46,7 +47,7 @@ function recordPreloadChannels({ argv = [] } = {}) {
   let api = null;
   const electron = {
     ipcRenderer,
-    webUtils: { getPathForFile: () => null },
+    webUtils: { getPathForFile },
     contextBridge: { exposeInMainWorld: (_name, exposed) => (api = exposed) },
   };
   const sandbox = {
@@ -125,6 +126,38 @@ describe('IPC contract between preload.js and the main process', () => {
     await listeners.get(requestChannel)({}, { requestId: 'r1' });
 
     expect(ipcRenderer.send).toHaveBeenCalledWith(doneChannel, { requestId: 'r1' });
+  });
+
+  it('preload logs a request handler that throws on ui:log and still answers', async () => {
+    const { listeners, ipcRenderer, api } = recordPreloadChannels();
+    api.onAppFlushRequest(() => {
+      throw new Error('flush broke');
+    });
+
+    await listeners.get(FLUSH_REQUEST_CHANNEL)({}, { requestId: 'r2' });
+
+    expect(ipcRenderer.send).toHaveBeenCalledWith(
+      IpcChannels.UI_LOG,
+      expect.objectContaining({
+        level: 'error',
+        message: expect.stringContaining('app:flushRequest handler failed: Error: flush broke'),
+      })
+    );
+    expect(ipcRenderer.send).toHaveBeenCalledWith(FLUSH_DONE_CHANNEL, { requestId: 'r2' });
+  });
+
+  it('preload logs a dropped file whose path cannot be resolved and returns null', () => {
+    const { ipcRenderer, api } = recordPreloadChannels({
+      getPathForFile: () => {
+        throw new Error('not a file');
+      },
+    });
+
+    expect(api.getPathForFile({})).toBeNull();
+    expect(ipcRenderer.send).toHaveBeenCalledWith(IpcChannels.UI_LOG, {
+      level: 'warn',
+      message: "Could not resolve the dropped file's path: Error: not a file",
+    });
   });
 
   it.each([

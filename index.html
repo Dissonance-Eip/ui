@@ -184,10 +184,10 @@
 
                 <div class="mt-3 grid grid-cols-1 gap-3 min-[820px]:grid-cols-2">
                   <label class="block">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Title</div>
+                    <div class="field-label">Title</div>
                     <input
-                      id="metaTagTitle"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="title"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -195,10 +195,10 @@
                   </label>
 
                   <label class="block">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Artist</div>
+                    <div class="field-label">Artist</div>
                     <input
-                      id="metaTagArtist"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="artist"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -206,10 +206,10 @@
                   </label>
 
                   <label class="block">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Date</div>
+                    <div class="field-label">Date</div>
                     <input
-                      id="metaTagDate"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="date"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -217,10 +217,10 @@
                   </label>
 
                   <label class="block">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Genre</div>
+                    <div class="field-label">Genre</div>
                     <input
-                      id="metaTagGenre"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="genre"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -228,10 +228,10 @@
                   </label>
 
                   <label class="block min-[820px]:col-span-2">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Comment</div>
+                    <div class="field-label">Comment</div>
                     <input
-                      id="metaTagComment"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="comment"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -239,10 +239,10 @@
                   </label>
 
                   <label class="block">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Copyright</div>
+                    <div class="field-label">Copyright</div>
                     <input
-                      id="metaTagCopyright"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="copyright"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -250,10 +250,10 @@
                   </label>
 
                   <label class="block">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Software</div>
+                    <div class="field-label">Software</div>
                     <input
-                      id="metaTagSoftware"
-                      class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      data-tag="software"
+                      class="field-input"
                       type="text"
                       placeholder="—"
                       autocomplete="off"
@@ -271,7 +271,7 @@
                     Protection
                   </h3>
                   <div class="mt-3">
-                    <div class="text-sm text-slate-600 dark:text-slate-400">Processing modes</div>
+                    <div class="field-label">Processing modes</div>
                     <details class="mt-2">
                       <summary
                         class="flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
@@ -386,7 +386,7 @@
                   class="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/40"
                   aria-label="Original WAV info"
                 >
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Original</div>
+                  <div class="field-label">Original</div>
                   <div
                     id="compareOrigFilename"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -394,7 +394,7 @@
                     —
                   </div>
 
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Duration</div>
+                  <div class="field-label">Duration</div>
                   <div
                     id="compareOrigDuration"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -402,7 +402,7 @@
                     —
                   </div>
 
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Sample rate</div>
+                  <div class="field-label">Sample rate</div>
                   <div
                     id="compareOrigSampleRate"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -410,7 +410,7 @@
                     —
                   </div>
 
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Channels</div>
+                  <div class="field-label">Channels</div>
                   <div
                     id="compareOrigChannels"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -431,7 +431,7 @@
                   class="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/40"
                   aria-label="Processed WAV info"
                 >
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Processed</div>
+                  <div class="field-label">Processed</div>
                   <div
                     id="compareProcFilename"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -439,7 +439,7 @@
                     —
                   </div>
 
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Duration</div>
+                  <div class="field-label">Duration</div>
                   <div
                     id="compareProcDuration"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -447,7 +447,7 @@
                     —
                   </div>
 
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Sample rate</div>
+                  <div class="field-label">Sample rate</div>
                   <div
                     id="compareProcSampleRate"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"
@@ -455,7 +455,7 @@
                     —
                   </div>
 
-                  <div class="text-sm text-slate-600 dark:text-slate-400">Channels</div>
+                  <div class="field-label">Channels</div>
                   <div
                     id="compareProcChannels"
                     class="text-sm text-slate-900 truncate dark:text-slate-100"

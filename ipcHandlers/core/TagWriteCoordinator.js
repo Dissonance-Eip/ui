@@ -15,6 +15,7 @@
  * Electron-free: the core addon, lock and notifier are injected.
  */
 const { diffTags, hasTagChanges } = require('./tagMerge');
+const { logger } = require('../../main/logger');
 
 const NOOP_NOTIFIER = Object.freeze({
   beforeWrite: async () => {},
@@ -92,7 +93,8 @@ class TagWriteCoordinator {
     try {
       const resp = await this.coreAddon.readMetadata(filePath);
       return resp && resp.ok && resp.tags ? resp.tags : fallbackTags;
-    } catch (_e) {
+    } catch (e) {
+      logger.warn(`Could not re-read tags of ${filePath}; using the last known ones`, e);
       return fallbackTags;
     }
   }

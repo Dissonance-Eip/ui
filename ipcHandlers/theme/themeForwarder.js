@@ -8,6 +8,7 @@
  */
 const { sendToRenderer } = require('../rendererMessaging');
 const { IpcChannels } = require('../ipcChannels');
+const { logger } = require('../../main/logger');
 
 const SYSTEM_THEME_CHANNEL = IpcChannels.UI_SYSTEM_THEME;
 
@@ -22,7 +23,7 @@ function createThemeForwarder({ getWindows, resolveMode }) {
     try {
       mode = await resolveMode();
     } catch (e) {
-      console.error('Failed to resolve the system theme', e);
+      logger.error('Failed to resolve the system theme', e);
       return;
     }
     if (mode === lastSentMode) return;

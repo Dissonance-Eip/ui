@@ -136,7 +136,7 @@ Processing is mode-driven. Select one or more modes on the Analyze view, then pr
 
 See [`renderer/ARCHITECTURE.md`](renderer/ARCHITECTURE.md) for the full folder map. Quick view:
 
-- **Main process** (`main/`, `ipcHandlers/`) — window manager (one process, several windows), IPC handlers split by responsibility, single composition root in `fileHandlers.js`
+- **Main process** (`main/`, `ipcHandlers/`) — window manager (one process, several windows), IPC handlers split by responsibility, single composition root in `fileHandlers.js`; logs go through `main/logger.js`
 - **Preload** (`preload.js`) — minimal contextBridge exposing `window.dissonance.*`
 - **Renderer** (`renderer/`) — composition root in `app/bootstrap.js`, then `controllers/` → `views/` + `components/` + `services/` + `infrastructure/`
 
@@ -155,7 +155,7 @@ The main side takes every name from `ipcHandlers/ipcChannels.js`. The sandboxed 
 | `core:readMetadata`                    | Read header + LIST/INFO tags without decoding audio          |
 | `core:writeTags`                       | Rewrite the LIST/INFO chunk in place                         |
 | `core:export`                          | Save-as dialog + copy a processed temp file                  |
-| `core:cleanupProcessed`                | Delete a tracked temp file                                   |
+| `core:cleanupProcessed`                | Delete a tracked temp file (`ok: false` if it can't be)      |
 | `ui:getSystemTheme` + `ui:systemTheme` | OS light/dark sync                                           |
 | `ui:log`                               | Renderer log line → main-process console                     |
 | `app:flushRequest` + `app:flushDone`   | Quit/close coordination so pending writes finish before exit |

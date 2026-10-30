@@ -18,8 +18,8 @@ export class TerminalLogger extends Logger {
         this.bridge.logToMain(level, String(message));
         return;
       }
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      console.error('logToMain failed, logging here instead', e);
     }
 
     const fn = console && typeof console[level] === 'function' ? console[level] : console.log;

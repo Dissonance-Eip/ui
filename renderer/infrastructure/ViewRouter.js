@@ -6,7 +6,6 @@
 export class ViewRouter {
   constructor(views) {
     this.views = views;
-    this.current = null;
   }
 
   show(name) {
@@ -14,10 +13,5 @@ export class ViewRouter {
       if (!el) continue;
       el.hidden = key !== name;
     }
-    this.current = name;
-  }
-
-  getCurrent() {
-    return this.current;
   }
 }

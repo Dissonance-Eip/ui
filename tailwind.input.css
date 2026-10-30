@@ -9,6 +9,18 @@
   }
 }
 
+/* Repeated form styles: the metadata inputs and the muted field labels
+   (Analyze metadata + processing modes, Compare info panels). */
+@layer components {
+  .field-label {
+    @apply text-sm text-slate-600 dark:text-slate-400;
+  }
+
+  .field-input {
+    @apply mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+}
+
 /* Indeterminate progress bar (no real percentage available from the core
    addon yet) - a segment slides back and forth across the track. */
 @keyframes indeterminate-bar {

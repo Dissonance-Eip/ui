@@ -2,7 +2,8 @@
  * Resource-tracking base class.
  *
  * track(fn) registers a teardown callback; dispose() runs them all in LIFO
- * order exactly once. Used by BaseComponent and BaseController to keep
+ * order exactly once. A teardown that throws doesn't stop the others; once
+ * all have run, dispose() throws an AggregateError with every failure. Used by BaseComponent and BaseController to keep
  * event listeners + child disposables tidy when a view/controller unmounts.
  */
 export class Disposable {
@@ -14,11 +15,7 @@ export class Disposable {
   track(disposeFn) {
     if (typeof disposeFn !== 'function') return disposeFn;
     if (this._disposed) {
-      try {
-        disposeFn();
-      } catch (_e) {
-        // ignore
-      }
+      disposeFn();
       return disposeFn;
     }
     this._disposables.push(disposeFn);
@@ -30,19 +27,18 @@ export class Disposable {
     this._disposed = true;
 
     // Dispose in LIFO order (mirrors typical resource acquisition order).
+    const failures = [];
     for (let i = this._disposables.length - 1; i >= 0; i -= 1) {
-      const fn = this._disposables[i];
       try {
-        fn();
-      } catch (_e) {
-        // ignore
+        this._disposables[i]();
+      } catch (e) {
+        failures.push(e);
       }
     }
 
     this._disposables.length = 0;
-  }
-
-  get isDisposed() {
-    return this._disposed;
+    if (failures.length > 0) {
+      throw new AggregateError(failures, `${failures.length} teardown callback(s) failed`);
+    }
   }
 }

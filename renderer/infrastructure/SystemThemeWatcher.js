@@ -1,3 +1,5 @@
+import { TerminalLogger } from './TerminalLogger.js';
+
 /**
  * Bridges the OS-level dark/light preference into the renderer.
  * On start(): asks main for the current mode, then subscribes for updates.
@@ -6,8 +8,9 @@
  * canvas in place with theme-appropriate colours (playback continues).
  */
 export class SystemThemeWatcher {
-  constructor({ api, rootEl } = {}) {
+  constructor({ api, rootEl, logger = new TerminalLogger() } = {}) {
     this.api = api;
+    this.logger = logger;
     this.rootEl = rootEl || document.documentElement;
     this._unsubscribe = null;
     this._onTheme = this._onTheme.bind(this);
@@ -16,7 +19,7 @@ export class SystemThemeWatcher {
   /**
    * Apply the OS theme NOW (one-shot fetch) and subscribe for changes.
    * Returns no value but stores the unsubscribe in `_unsubscribe` for stop().
-   * Errors from either call are swallowed — theme is non-critical.
+   * Errors from either call are logged, not thrown — theme is non-critical.
    */
   async start() {
     if (!this.api) return;
@@ -24,23 +27,23 @@ export class SystemThemeWatcher {
     try {
       const initial = await this.api.getSystemTheme?.();
       this._onTheme(initial);
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      this.logger.error(`Could not read the system theme: ${e}`);
     }
 
     try {
       const unsub = this.api.onSystemTheme?.(this._onTheme);
       this._unsubscribe = typeof unsub === 'function' ? unsub : null;
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      this.logger.error(`Could not subscribe to system theme changes: ${e}`);
     }
   }
 
   stop() {
     try {
       this._unsubscribe?.();
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      this.logger.error(`Could not unsubscribe from system theme changes: ${e}`);
     }
     this._unsubscribe = null;
   }
@@ -50,14 +53,14 @@ export class SystemThemeWatcher {
     const isDark = mode === 'dark';
     try {
       this.rootEl.classList.toggle('dark', isDark);
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      this.logger.error(`Could not apply the ${mode} theme: ${e}`);
     }
 
     try {
       window.dispatchEvent(new CustomEvent('dissonance:theme', { detail: { mode } }));
-    } catch (_e) {
-      // ignore
+    } catch (e) {
+      this.logger.error(`Could not announce the ${mode} theme: ${e}`);
     }
   }
 }

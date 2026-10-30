@@ -10,6 +10,7 @@
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { secureWebPreferences, hardenNavigation } = require('./windowSecurity');
+const { logger } = require('./logger');
 
 const MIN_WINDOW_WIDTH = 560;
 const MIN_WINDOW_HEIGHT = 680;
@@ -62,8 +63,8 @@ class MainWindowManager {
     win.once('ready-to-show', () => {
       try {
         win.show();
-      } catch (_e) {
-        // ignore
+      } catch (e) {
+        logger.error('Could not show the window', e);
       }
     });
 

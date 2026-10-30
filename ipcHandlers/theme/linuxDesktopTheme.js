@@ -12,6 +12,7 @@
  * can be unit tested.
  */
 const { DARK_MODE, LIGHT_MODE } = require('./themeModes');
+const { logger } = require('../../main/logger');
 
 const GSETTINGS_BIN = 'gsettings';
 const GSETTINGS_TIMEOUT_MS = 2000;
@@ -90,7 +91,8 @@ function readGsetting(execFile, { schema, key }) {
         { timeout: GSETTINGS_TIMEOUT_MS },
         (error, stdout) => resolve(error ? null : parseGsettingsString(stdout))
       );
-    } catch (_e) {
+    } catch (e) {
+      logger.warn(`Could not run ${GSETTINGS_BIN} get ${schema} ${key}`, e);
       resolve(null);
     }
   });
@@ -117,7 +119,8 @@ function spawnMonitor(spawn, { schema, key }, onChange) {
     child.on('error', () => {}); // ENOENT etc. arrives here; theme is non-critical
     child.stdout?.on('data', () => onChange());
     return child;
-  } catch (_e) {
+  } catch (e) {
+    logger.warn(`Could not start ${GSETTINGS_BIN} monitor ${schema} ${key}`, e);
     return null;
   }
 }
@@ -138,8 +141,8 @@ function watchLinuxThemeSettings({ env, spawn, onChange }) {
     children.forEach((child) => {
       try {
         child.kill();
-      } catch (_e) {
-        // already exited
+      } catch (e) {
+        logger.warn(`Could not stop ${GSETTINGS_BIN} monitor`, e);
       }
     });
   };
