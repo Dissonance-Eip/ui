@@ -40,7 +40,7 @@ export function bootstrap() {
 
   // Watch OS-level light/dark mode and apply Tailwind `dark` class.
   const themeWatcher = new SystemThemeWatcher({ api, logger });
-  themeWatcher.start();
+  themeWatcher.start().catch((e) => logger.error(`System theme watcher failed: ${e}`));
 
   const router = new ViewRouter({
     upload: document.getElementById('view-upload'),
