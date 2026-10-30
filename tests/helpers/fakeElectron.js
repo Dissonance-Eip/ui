@@ -74,6 +74,7 @@ export class FakeBrowserWindow extends EventEmitter {
     this.webContents = makeWebContents();
     this._destroyed = false;
     this.show = vi.fn();
+    this.loadFile = vi.fn(async () => {});
     const WindowClass = this.constructor;
     WindowClass.openWindows = [...WindowClass.getAllWindows(), this];
     this.once('closed', () => {
@@ -97,4 +98,29 @@ export class FakeBrowserWindow extends EventEmitter {
 /** A fresh FakeBrowserWindow class whose getAllWindows() only sees its own windows. */
 export function makeBrowserWindowClass() {
   return class extends FakeBrowserWindow {};
+}
+
+/**
+ * An Electron `app`-like emitter. `whenReady()` resolves at once;
+ * `quit()` is a spy that also emits 'before-quit' and, unless a listener
+ * called preventDefault(), 'will-quit' — like Electron does, once per app.
+ * `isPrimary: false` fakes a second launch (the single-instance lock is taken).
+ */
+export function makeApp({ isPrimary = true, isPackaged = false, dock = null } = {}) {
+  const app = new EventEmitter();
+  let hasQuit = false;
+  return Object.assign(app, {
+    isPackaged,
+    dock,
+    setName: vi.fn(),
+    whenReady: vi.fn(() => Promise.resolve()),
+    requestSingleInstanceLock: vi.fn(() => isPrimary),
+    quit: vi.fn(() => {
+      let prevented = false;
+      app.emit('before-quit', { preventDefault: () => (prevented = true) });
+      if (prevented || hasQuit) return;
+      hasQuit = true;
+      app.emit('will-quit');
+    }),
+  });
 }
