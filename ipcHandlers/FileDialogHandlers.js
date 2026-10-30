@@ -4,19 +4,23 @@
  * The renderer may pass the last imported file path; the dialog then opens
  * in that file's folder.
  */
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, dialog: electronDialog } = require('electron');
 const path = require('path');
 const { IpcChannels } = require('./ipcChannels');
 
 class FileDialogHandlers {
-  /** @param {{ipc?: {handle: Function}}} [opts] ipc defaults to ipcMain; tests pass a double */
-  constructor({ ipc = ipcMain } = {}) {
+  /**
+   * @param {{ipc?: {handle: Function}, dialog?: {showOpenDialog: Function}}} [opts]
+   *   ipc defaults to ipcMain and dialog to Electron's dialog; tests pass doubles
+   */
+  constructor({ ipc = ipcMain, dialog = electronDialog } = {}) {
     this.ipc = ipc;
+    this.dialog = dialog;
   }
 
   register() {
     this.ipc.handle(IpcChannels.DIALOG_OPEN_FILE, async (_event, lastFilePath) => {
-      const { canceled, filePaths } = await dialog.showOpenDialog({
+      const { canceled, filePaths } = await this.dialog.showOpenDialog({
         properties: ['openFile'],
         defaultPath:
           typeof lastFilePath === 'string' && lastFilePath ? path.dirname(lastFilePath) : undefined,
