@@ -25,3 +25,22 @@ export function buildProcessingOptions(modes) {
   }
   return { modes, perturbation: DEFAULT_PERTURBATION };
 }
+
+const PLACEHOLDER = '—';
+
+// Mode ids are snake_case versions of their picker labels (white_noise → White Noise).
+const labelOf = (mode) =>
+  mode
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+/** "White Noise, Pink Noise" for ['white_noise', 'pink_noise']. */
+export function formatModes(modes) {
+  return modes && modes.length > 0 ? modes.map(labelOf).join(', ') : PLACEHOLDER;
+}
+
+/** The perturbation strength, at most two decimals. */
+export function formatIntensity(value) {
+  return Number.isFinite(value) ? String(Math.round(value * 100) / 100) : PLACEHOLDER;
+}

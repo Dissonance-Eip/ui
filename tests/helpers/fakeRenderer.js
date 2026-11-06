@@ -83,6 +83,7 @@ export function makeCompareView() {
     unmount: vi.fn(),
     setOriginalInfo: vi.fn(),
     setProcessedInfo: vi.fn(),
+    setProcessingInfo: vi.fn(),
     setAudioPreviewFiles: vi.fn(),
     setOriginalAudioPreviewFile: vi.fn(),
     pauseAudioPreviews: vi.fn(),

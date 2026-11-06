@@ -43,6 +43,29 @@ describe('CompareView info panels', () => {
     expect(panelText(els, 'proc')).toEqual(['—', '—', '—', '—']);
   });
 
+  it('renders the modes and intensity the file was processed with', () => {
+    const modesEl = new FakeElement();
+    const intensityEl = new FakeElement();
+    const view = new CompareView({ procModesEl: modesEl, procIntensityEl: intensityEl });
+
+    view.setProcessingInfo({ modes: ['white_noise', 'phase_distortion'], perturbation: 0.8 });
+
+    expect([modesEl.textContent, intensityEl.textContent]).toEqual([
+      'White Noise, Phase Distortion',
+      '0.8',
+    ]);
+  });
+
+  it('renders placeholders for missing processing info', () => {
+    const modesEl = new FakeElement();
+    const intensityEl = new FakeElement();
+    const view = new CompareView({ procModesEl: modesEl, procIntensityEl: intensityEl });
+
+    view.setProcessingInfo(null);
+
+    expect([modesEl.textContent, intensityEl.textContent]).toEqual(['—', '—']);
+  });
+
   it('enables and disables export', () => {
     const exportBtn = new FakeElement();
     const view = new CompareView({ exportBtn });

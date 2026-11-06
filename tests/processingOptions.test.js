@@ -3,6 +3,8 @@ import {
   canProcess,
   DEFAULT_PERTURBATION,
   buildProcessingOptions,
+  formatModes,
+  formatIntensity,
 } from '../renderer/utils/processingOptions.js';
 
 describe('buildProcessingOptions & canProcess', () => {
@@ -55,5 +57,25 @@ describe('buildProcessingOptions & canProcess', () => {
     it('returns false when hasFile is undefined', () => {
       expect(canProcess(undefined, ['white_noise'])).toBe(false);
     });
+  });
+});
+
+describe('formatModes & formatIntensity', () => {
+  it('turns mode ids into the labels the mode picker shows', () => {
+    const modes = ['white_noise', 'phase_distortion', 'spectral_gate', 'pink_noise'];
+
+    expect(formatModes(modes)).toBe('White Noise, Phase Distortion, Spectral Gate, Pink Noise');
+  });
+
+  it('renders a placeholder without modes', () => {
+    expect([formatModes([]), formatModes(undefined)]).toEqual(['—', '—']);
+  });
+
+  it('rounds the intensity to two decimals', () => {
+    expect([formatIntensity(0.8), formatIntensity(0.1 + 0.2)]).toEqual(['0.8', '0.3']);
+  });
+
+  it('renders a placeholder for a missing intensity', () => {
+    expect([formatIntensity(undefined), formatIntensity(Number.NaN)]).toEqual(['—', '—']);
   });
 });

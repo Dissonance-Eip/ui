@@ -7,6 +7,7 @@ import { TempFileManager } from '../ipcHandlers/core/TempFileManager.js';
 import { makeHandlingIpc, makeWebContents } from './helpers/fakeElectron.js';
 
 const EXPORT_CHANNEL = 'core:export';
+const PROCESS_CHANNEL = 'core:process';
 const STATUS_CHANNEL = 'core:status';
 const PROCESSED_AUDIO = 'processed audio bytes';
 const SECRET = 'private key material';
@@ -31,22 +32,36 @@ afterEach(async () => {
   await fs.rm(workDir, { recursive: true, force: true });
 });
 
-function setup({ savePath = path.join(outsideDir, 'exported.wav'), canceled = false } = {}) {
+/** A core that writes its output where it was told to, like the real addon. */
+const writingCore = () => ({
+  process: vi.fn(async (_input, { outputPath }) => {
+    await fs.writeFile(outputPath, PROCESSED_AUDIO);
+    return { processedPath: outputPath };
+  }),
+});
+
+function setup({
+  savePath = path.join(outsideDir, 'exported.wav'),
+  canceled = false,
+  coreAddon = {},
+} = {}) {
   const ipc = makeHandlingIpc();
   const dialog = { showSaveDialog: vi.fn(async () => ({ canceled, filePath: savePath })) };
   const tempFileManager = new TempFileManager({ rootDir });
-  new CoreIpcHandlers({
-    coreAddon: {},
+  const handlers = new CoreIpcHandlers({
+    coreAddon,
     tempFileManager,
-    fileLock: {},
+    fileLock: { runExclusive: (_filePath, fn) => fn() },
     tagWriteCoordinator: {},
     ipc,
     dialog,
-  }).register();
+  });
+  handlers.register();
 
   const sender = makeWebContents();
   const exportFile = (payload) => ipc.handlers.get(EXPORT_CHANNEL)({ sender }, payload);
-  return { ipc, dialog, tempFileManager, sender, exportFile, savePath };
+  const processFile = (payload) => ipc.handlers.get(PROCESS_CHANNEL)({ sender }, payload);
+  return { ipc, dialog, handlers, tempFileManager, sender, exportFile, processFile, savePath };
 }
 
 /** A processed temp file the app created itself, the way core:process does. */
@@ -286,6 +301,55 @@ describe('core:export destination', () => {
 
     expect(result).toEqual({ ok: true, exportedPath: original });
     expect(await fs.readFile(original, 'utf8')).toBe(PROCESSED_AUDIO);
+  });
+});
+
+describe('core:export default name', () => {
+  const defaultPathOf = (dialog) => dialog.showSaveDialog.mock.calls[0][0].defaultPath;
+
+  it('suggests the input name tagged with the modes and intensity it was processed with', async () => {
+    const { dialog, processFile, exportFile } = setup({ coreAddon: writingCore() });
+    const options = { modes: ['white_noise', 'pink_noise'], perturbation: 0.8 };
+    const { processedPath } = await processFile({ filePath: '/music/song.wav', options });
+
+    await exportFile(processedPath);
+
+    expect(defaultPathOf(dialog)).toBe('song_white-noise+pink-noise_0.8.wav');
+  });
+
+  it('forgets the suggested name once the processed file is cleaned up', async () => {
+    const { ipc, dialog, tempFileManager, sender, processFile, exportFile } = setup({
+      coreAddon: writingCore(),
+    });
+    const options = { modes: ['white_noise'], perturbation: 0.8 };
+    const { processedPath } = await processFile({ filePath: '/music/song.wav', options });
+    await ipc.handlers.get('core:cleanupProcessed')({ sender }, processedPath);
+    // Same path tracked again, as if minted anew, to see which name export picks.
+    await fs.writeFile(processedPath, PROCESSED_AUDIO);
+    tempFileManager.registerForSender(sender.id, processedPath);
+
+    await exportFile(processedPath);
+
+    expect(defaultPathOf(dialog)).toBe(path.basename(processedPath));
+  });
+
+  it('drops the name of an output a new run on the same window replaced', async () => {
+    const { handlers, processFile } = setup({ coreAddon: writingCore() });
+    const first = await processFile({ filePath: '/music/song.wav', options: { modes: ['a'] } });
+
+    const second = await processFile({ filePath: '/music/song.wav', options: { modes: ['b'] } });
+
+    expect([...handlers.exportNames]).toEqual([[second.processedPath, 'song_b.wav']]);
+    expect(first.processedPath).not.toBe(second.processedPath);
+  });
+
+  it('falls back to the temp file name when it was not processed here', async () => {
+    const { dialog, tempFileManager, sender, exportFile } = setup();
+    const processedPath = await makeTrackedTempFile(tempFileManager, sender.id);
+
+    await exportFile(processedPath);
+
+    expect(defaultPathOf(dialog)).toBe(path.basename(processedPath));
   });
 });
 

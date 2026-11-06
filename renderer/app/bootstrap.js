@@ -82,6 +82,8 @@ export function bootstrap() {
     procDurationEl: document.getElementById('compareProcDuration'),
     procSampleRateEl: document.getElementById('compareProcSampleRate'),
     procChannelsEl: document.getElementById('compareProcChannels'),
+    procModesEl: document.getElementById('compareProcModes'),
+    procIntensityEl: document.getElementById('compareProcIntensity'),
     procWaveformEl: document.getElementById('compareProcWaveform'),
     exportBtn: document.getElementById('compareExportBtn'),
   });
