@@ -72,6 +72,7 @@ describe('hardenNavigation', () => {
     expect(result).toEqual({ action: 'deny' });
     expect(openExternal).toHaveBeenCalledWith('https://example.com/');
     expect(error).toHaveBeenCalledWith(
+      '[handled]',
       'Failed to open link in the system browser:',
       expect.any(Error)
     );

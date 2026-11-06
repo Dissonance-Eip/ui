@@ -136,7 +136,7 @@ Processing is mode-driven. Select one or more modes on the Analyze view, then pr
 
 See [`renderer/ARCHITECTURE.md`](renderer/ARCHITECTURE.md) for the full folder map. Quick view:
 
-- **Main process** (`main/`, `ipcHandlers/`) — window manager (one process, several windows), IPC handlers split by responsibility, single composition root in `fileHandlers.js`; logs go through `main/logger.js`
+- **Main process** (`main/`, `ipcHandlers/`) — window manager (one process, several windows), IPC handlers split by responsibility, single composition root in `fileHandlers.js`; logs go through `main/logger.js`, which starts every warn and error line with `[handled]` (caught and dealt with) or `[unhandled]` (nothing caught it: uncaught exceptions and unhandled rejections in main, the renderer and preload)
 - **Preload** (`preload.js`) — minimal contextBridge exposing `window.dissonance.*`
 - **Renderer** (`renderer/`) — composition root in `app/bootstrap.js`, then `controllers/` → `views/` + `components/` + `services/` + `infrastructure/`
 

@@ -13,7 +13,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
 ## Folder map
 
 - `renderer/app/`
-  - `bootstrap.js` — composition root for the renderer. The only place that constructs and wires dependencies.
+  - `bootstrap.js` — composition root for the renderer. The only place that constructs and wires dependencies. Also sends the window's uncaught errors and unhandled rejections to main as `unhandled` log lines.
 - `renderer/base/`
   - `Disposable.js` — tracks cleanups/unsubscribes in LIFO order. A failing cleanup doesn't stop the rest; `dispose()` then throws an `AggregateError` of the failures.
   - `BaseComponent.js` — mount/unmount lifecycle + tracked `listen()` for events.
@@ -22,7 +22,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `Logger.js` — interface only; documents the Logger contract.
 - `renderer/infrastructure/`
   - `DissonanceApi.js` — typed-ish facade over `window.dissonance` (preload bridge).
-  - `TerminalLogger.js` — forwards log lines to the main process via `ui:log`.
+  - `TerminalLogger.js` — forwards log lines to the main process via `ui:log`. In the terminal, `error()` lines read `[handled] [UI] …` and `unhandled()` lines `[unhandled] [UI] …`.
   - `SystemThemeWatcher.js` — bridges OS light/dark mode into the renderer, toggles Tailwind `dark` class, dispatches `dissonance:theme` events.
   - `ViewRouter.js` — show-one-hide-others switcher for the three top-level views.
 - `renderer/controllers/`
