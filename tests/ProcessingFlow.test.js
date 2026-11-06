@@ -61,6 +61,23 @@ describe('ProcessingFlow.process', () => {
     expect(screens.showCompare).toHaveBeenCalled();
   });
 
+  it('shows Compare the options the core ran with, not modes picked meanwhile', async () => {
+    const { flow, api, analyzeView, compareView } = makeFlow({ modes: ['white_noise'] });
+    const reply = deferred();
+    api.processFile.mockReturnValueOnce(reply.promise);
+
+    const run = flow.process();
+    await settle();
+    analyzeView.getProcessingModes.mockReturnValue(['pink_noise']);
+    reply.resolve({ ok: true, processedPath: OUT });
+    await run;
+
+    expect(compareView.setProcessingInfo).toHaveBeenCalledWith({
+      modes: ['white_noise'],
+      perturbation: 0.8,
+    });
+  });
+
   it('reports an unknown error when the core gives no reason', async () => {
     const { flow, api, logger, screens } = makeFlow();
     api.processFile.mockResolvedValueOnce(null);

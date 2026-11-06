@@ -25,6 +25,7 @@ const { senderOf, sendToRenderer } = require('../rendererMessaging');
 const { IpcChannels } = require('../ipcChannels');
 const { logger: mainLogger } = require('../../main/logger');
 const { checkExportSource, checkExportDestination } = require('./exportPaths');
+const { buildExportFilename } = require('./exportFilename');
 const {
   checkFilePath,
   checkProcessedPath,
@@ -75,6 +76,9 @@ class CoreIpcHandlers {
     this.ipc = ipc;
     this.dialog = dialog;
     this.logger = logger;
+    // processedPath → the name the export dialog suggests, built from the
+    // options the core actually ran with (see exportFilename.js).
+    this.exportNames = new Map();
   }
 
   register() {
@@ -98,6 +102,7 @@ class CoreIpcHandlers {
     const error = await this._deleteTempFile(() =>
       this.tempFileManager.cleanupTempFile(processedPath)
     );
+    this.exportNames.delete(processedPath);
     return error ? { ok: false, error: String(error) } : { ok: true };
   }
 
@@ -134,6 +139,7 @@ class CoreIpcHandlers {
       );
       const processedPath = result?.processedPath ?? outputPath;
       this.tempFileManager.registerForSender(senderId, processedPath);
+      this._rememberExportName(processedPath, buildExportFilename(filePath, userOptions));
 
       sendToRenderer(sender, STATUS_CHANNEL, {
         status: 'processed',
@@ -192,7 +198,7 @@ class CoreIpcHandlers {
       // The destination only ever comes from the save dialog, never the renderer.
       const { canceled, filePath } = await this.dialog.showSaveDialog({
         title: 'Export processed file',
-        defaultPath: path.basename(processedPath),
+        defaultPath: this.exportNames.get(processedPath) ?? path.basename(processedPath),
         filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
       });
       if (canceled || !filePath) return { ok: false, error: 'Export canceled' };
@@ -204,6 +210,7 @@ class CoreIpcHandlers {
 
       // The export succeeded; a temp file that can't be deleted is only logged.
       await this._deleteTempFile(() => this.tempFileManager.cleanupTempFile(processedPath));
+      this.exportNames.delete(processedPath);
 
       sendToRenderer(sender, STATUS_CHANNEL, {
         status: 'exported',
@@ -217,6 +224,14 @@ class CoreIpcHandlers {
       sendToRenderer(sender, STATUS_CHANNEL, { status: 'error', message: 'Export failed' });
       return { ok: false, error: String(err) };
     }
+  }
+
+  /** Also drops names of temp files no longer tracked (e.g. replaced by a new run). */
+  _rememberExportName(processedPath, name) {
+    for (const p of this.exportNames.keys()) {
+      if (!this.tempFileManager.isTracked(p)) this.exportNames.delete(p);
+    }
+    this.exportNames.set(processedPath, name);
   }
 
   /**

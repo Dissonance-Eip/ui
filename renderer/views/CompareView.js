@@ -6,6 +6,7 @@
 import { BaseComponent } from '../base/BaseComponent.js';
 import { WaveformPreview } from '../components/WaveformPreview.js';
 import { renderWavInfo } from './renderWavInfo.js';
+import { formatModes, formatIntensity } from '../utils/processingOptions.js';
 
 export class CompareView extends BaseComponent {
   constructor({
@@ -18,6 +19,8 @@ export class CompareView extends BaseComponent {
     procDurationEl,
     procSampleRateEl,
     procChannelsEl,
+    procModesEl,
+    procIntensityEl,
     procWaveformEl,
     exportBtn,
   }) {
@@ -31,6 +34,8 @@ export class CompareView extends BaseComponent {
     this.procDurationEl = procDurationEl;
     this.procSampleRateEl = procSampleRateEl;
     this.procChannelsEl = procChannelsEl;
+    this.procModesEl = procModesEl;
+    this.procIntensityEl = procIntensityEl;
 
     this.exportBtn = exportBtn;
 
@@ -95,6 +100,13 @@ export class CompareView extends BaseComponent {
       },
       basicInfo
     );
+  }
+
+  /** @param {{modes?: string[], perturbation?: number}|null} options  what the core ran with */
+  setProcessingInfo(options) {
+    const { modes, perturbation } = options || {};
+    if (this.procModesEl) this.procModesEl.textContent = formatModes(modes);
+    if (this.procIntensityEl) this.procIntensityEl.textContent = formatIntensity(perturbation);
   }
 
   // ---------------------------------------------------------------------------

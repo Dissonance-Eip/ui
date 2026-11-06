@@ -82,7 +82,7 @@ export class ProcessingFlow {
       return;
     }
     if (resp && resp.ok && resp.processedPath) {
-      await this._showResult(resp.processedPath);
+      await this._showResult(resp.processedPath, options);
       return;
     }
     const errMsg = errorOf(resp);
@@ -91,8 +91,11 @@ export class ProcessingFlow {
     this.screens.showAnalyze();
   }
 
-  /** Tag the output with the user's edits, then populate and reveal Compare. */
-  async _showResult(processedPath) {
+  /**
+   * Tag the output with the user's edits, then populate and reveal Compare.
+   * `options` are the ones sent to the core, not the picker's current state.
+   */
+  async _showResult(processedPath, options) {
     this.tags.copyFormTo(processedPath);
     await this.tags.flush();
     this.state.setProcessedFilePath(processedPath);
@@ -105,6 +108,7 @@ export class ProcessingFlow {
 
     this.compareView.setOriginalInfo(this.getOriginalInfo());
     this.compareView.setProcessedInfo(processedInfo);
+    this.compareView.setProcessingInfo(options);
     this.compareView.setAudioPreviewFiles?.({
       originalPath: this.state.currentFilePath,
       processedPath: this.state.processedFilePath,
