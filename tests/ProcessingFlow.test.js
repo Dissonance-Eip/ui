@@ -85,6 +85,8 @@ describe('ProcessingFlow.process', () => {
     await flow.process();
 
     expect(logger.setStatus).toHaveBeenLastCalledWith('Processing failed: Unknown error', true);
+    // Once, as the error status line; not again at log level.
+    expect(logger.log).not.toHaveBeenCalledWith(expect.stringContaining('failed'));
     expect(screens.showAnalyze).toHaveBeenCalled();
   });
 
@@ -174,5 +176,6 @@ describe('ProcessingFlow.exportResult', () => {
     expect(state.processedFilePath).toBe(OUT);
     expect(resetToUpload).not.toHaveBeenCalled();
     expect(logger.setStatus).toHaveBeenLastCalledWith('Export failed: Unknown error', true);
+    expect(logger.log).not.toHaveBeenCalledWith(expect.stringContaining('failed'));
   });
 });

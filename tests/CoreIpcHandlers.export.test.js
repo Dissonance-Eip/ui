@@ -119,6 +119,7 @@ describe('core:export source', () => {
     expect(await fs.readFile(savePath, 'utf8')).toBe(PROCESSED_AUDIO);
     expect(tempFileManager.isTracked(processedPath)).toBe(true);
     expect(console.error).toHaveBeenCalledWith(
+      '[handled]',
       'Could not delete a processed temp file',
       expect.objectContaining({ code: 'EPERM' })
     );

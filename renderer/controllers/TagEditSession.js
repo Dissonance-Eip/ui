@@ -38,7 +38,7 @@ export class TagEditSession {
       queue ??
       new TagWriteQueue({
         writeFn: (filePath, tags) => api.writeTags(filePath, tags),
-        onError: (err) => logger?.log?.(`Auto-save tags failed: ${err}`),
+        onError: (err) => logger?.error?.(`Auto-save tags failed: ${err}`),
       });
   }
 

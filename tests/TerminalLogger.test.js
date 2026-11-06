@@ -12,12 +12,14 @@ describe('TerminalLogger', () => {
     logger.error('bad');
     logger.setStatus('Ready');
     logger.setStatus('Broken', true);
+    logger.unhandled('Error: boom');
 
     expect(bridge.logToMain.mock.calls).toEqual([
       ['log', 'hi'],
       ['error', 'bad'],
       ['log', 'STATUS: Ready'],
-      ['log', 'STATUS(ERROR): Broken'],
+      ['error', 'STATUS(ERROR): Broken'],
+      ['unhandled', 'Error: boom'],
     ]);
   });
 
@@ -27,6 +29,14 @@ describe('TerminalLogger', () => {
     new TerminalLogger().log('local');
 
     expect(log).toHaveBeenCalledWith('local');
+  });
+
+  it('falls back to console.error for an unhandled error without a bridge', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    new TerminalLogger().unhandled('Error: boom');
+
+    expect(error).toHaveBeenCalledWith('Error: boom');
   });
 
   it('reports a failing bridge and still logs the line locally', () => {

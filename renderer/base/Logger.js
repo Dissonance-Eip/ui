@@ -5,6 +5,9 @@
  */
 export class Logger {
   log(_message) {}
+  /** An error the code caught and dealt with. */
   error(_message) {}
+  /** An error nothing caught (window `error` / `unhandledrejection`). */
+  unhandled(_message) {}
   setStatus(_message, _isError = false) {}
 }
