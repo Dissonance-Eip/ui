@@ -12,24 +12,39 @@ function makeQueue() {
   return { enqueue: vi.fn(), setBlocked: vi.fn(), flush: vi.fn(async () => {}) };
 }
 
-function makeSession() {
+/** `queue: null` gives the session its real TagWriteQueue over `api`. */
+function makeSession({ api = {}, queue = makeQueue() } = {}) {
   const state = new AppState();
   state.setCurrentFilePath(SONG);
   const analyzeView = makeAnalyzeView();
-  const queue = makeQueue();
+  const logger = makeLogger();
   const pausePreviews = vi.fn();
   const session = new TagEditSession({
-    api: {},
-    logger: makeLogger(),
+    api,
+    logger,
     state,
     analyzeView,
     pausePreviews,
     queue,
   });
-  return { session, state, analyzeView, queue, pausePreviews };
+  return { session, state, analyzeView, queue, logger, pausePreviews };
 }
 
 describe('TagEditSession', () => {
+  it('logs a failed auto-save as an error', async () => {
+    const writeTags = vi.fn(async () => {
+      throw new Error('disk full');
+    });
+    const { session, analyzeView, logger } = makeSession({ api: { writeTags }, queue: null });
+    analyzeView.setBasicWavInfo({ tags: TAGS });
+    session.setFormFill(SONG, { loaded: true, tags: TAGS });
+
+    await session.pauseAndFlush();
+
+    expect(logger.error).toHaveBeenCalledWith('Auto-save tags failed: Error: disk full');
+    expect(logger.log).not.toHaveBeenCalled();
+  });
+
   it('pauseAndFlush pauses the players, queues the loaded form, then drains', async () => {
     const { session, analyzeView, queue, pausePreviews } = makeSession();
     analyzeView.setBasicWavInfo({ tags: TAGS });

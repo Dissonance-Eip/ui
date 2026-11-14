@@ -87,7 +87,6 @@ export class ProcessingFlow {
     }
     const errMsg = errorOf(resp);
     this.logger?.setStatus?.(`Processing failed: ${errMsg}`, true);
-    this.logger?.log?.(`Processing failed: ${errMsg}`);
     this.screens.showAnalyze();
   }
 
@@ -136,7 +135,6 @@ export class ProcessingFlow {
       }
       const errMsg = errorOf(resp);
       this.logger?.setStatus?.(`Export failed: ${errMsg}`, true);
-      this.logger?.log?.(`Export failed: ${errMsg}`);
     } catch (err) {
       this.logger?.error?.(`Export failed: ${err}`);
     }

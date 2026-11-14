@@ -4,7 +4,9 @@ import { Logger } from '../base/Logger.js';
  * Logger that forwards every line over the preload bridge (`ui:log` IPC)
  * so messages show up in the main-process terminal. Falls back to
  * console.* if the bridge is missing (e.g. running outside Electron).
- * setStatus() prefixes messages with STATUS / STATUS(ERROR).
+ * setStatus() prefixes messages with STATUS / STATUS(ERROR), the latter at
+ * error level. Main marks error lines [handled] and unhandled() lines
+ * [unhandled].
  */
 export class TerminalLogger extends Logger {
   constructor(bridge) {
@@ -22,7 +24,8 @@ export class TerminalLogger extends Logger {
       console.error('logToMain failed, logging here instead', e);
     }
 
-    const fn = console && typeof console[level] === 'function' ? console[level] : console.log;
+    // `unhandled` is not a console method: it prints as an error.
+    const fn = console && typeof console[level] === 'function' ? console[level] : console.error;
     fn(String(message));
   }
 
@@ -34,8 +37,12 @@ export class TerminalLogger extends Logger {
     this._send('error', message);
   }
 
+  unhandled(message) {
+    this._send('unhandled', message);
+  }
+
   setStatus(message, isError = false) {
     const prefix = isError ? 'STATUS(ERROR)' : 'STATUS';
-    this._send('log', `${prefix}: ${message}`);
+    this._send(isError ? 'error' : 'log', `${prefix}: ${message}`);
   }
 }

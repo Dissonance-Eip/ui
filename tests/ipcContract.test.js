@@ -128,7 +128,7 @@ describe('IPC contract between preload.js and the main process', () => {
     expect(ipcRenderer.send).toHaveBeenCalledWith(doneChannel, { requestId: 'r1' });
   });
 
-  it('preload logs a request handler that throws on ui:log and still answers', async () => {
+  it('preload logs a request handler that throws as unhandled on ui:log and still answers', async () => {
     const { listeners, ipcRenderer, api } = recordPreloadChannels();
     api.onAppFlushRequest(() => {
       throw new Error('flush broke');
@@ -139,11 +139,55 @@ describe('IPC contract between preload.js and the main process', () => {
     expect(ipcRenderer.send).toHaveBeenCalledWith(
       IpcChannels.UI_LOG,
       expect.objectContaining({
-        level: 'error',
+        level: 'unhandled',
         message: expect.stringContaining('app:flushRequest handler failed: Error: flush broke'),
       })
     );
     expect(ipcRenderer.send).toHaveBeenCalledWith(FLUSH_DONE_CHANNEL, { requestId: 'r2' });
+  });
+
+  it.each([
+    [
+      'throws',
+      () => {
+        throw new Error('status broke');
+      },
+    ],
+    ['rejects', async () => Promise.reject(new Error('status broke'))],
+  ])('preload logs a subscriber that %s as unhandled with its stack', async (_case, callback) => {
+    const { listeners, ipcRenderer, api } = recordPreloadChannels();
+    api.onCoreStatus(callback);
+
+    await listeners.get(IpcChannels.CORE_STATUS)({}, { status: 'processing' });
+
+    expect(ipcRenderer.send).toHaveBeenCalledWith(IpcChannels.UI_LOG, {
+      level: 'unhandled',
+      message: expect.stringMatching(/^core:status subscriber failed: Error: status broke\n\s+at /),
+    });
+  });
+
+  it('preload logs a subscriber failure that cannot become text as a placeholder', async () => {
+    const { listeners, ipcRenderer, api } = recordPreloadChannels();
+    api.onCoreStatus(() => {
+      throw Object.create(null);
+    });
+
+    await listeners.get(IpcChannels.CORE_STATUS)({}, {});
+
+    expect(ipcRenderer.send).toHaveBeenCalledWith(IpcChannels.UI_LOG, {
+      level: 'unhandled',
+      message: 'core:status subscriber failed: (unprintable)',
+    });
+  });
+
+  it('preload passes the event data to a subscriber', async () => {
+    const { listeners, api } = recordPreloadChannels();
+    const callback = vi.fn();
+    api.onCoreStatus(callback);
+
+    await listeners.get(IpcChannels.CORE_STATUS)({}, { status: 'processing' });
+
+    expect(callback).toHaveBeenCalledWith({ status: 'processing' });
   });
 
   it('preload logs a dropped file whose path cannot be resolved and returns null', () => {

@@ -3,7 +3,8 @@
  *
  * Wires up the entire app on DOMContentLoaded:
  *   - api (DissonanceApi over the preload bridge)
- *   - logger (TerminalLogger → main process console)
+ *   - logger (TerminalLogger → main process console), which also reports
+ *     errors nothing caught (window `error` / `unhandledrejection`)
  *   - SystemThemeWatcher (Tailwind dark-mode toggle, stopped with the controller)
  *   - ViewRouter (upload / analyze / compare)
  *   - AppState (current + processed file paths)
@@ -26,9 +27,40 @@ import { AppController } from '../controllers/AppController.js';
 import { WavMetadataService } from '../services/WavMetadataService.js';
 import { exposeDebugGlobals } from './debugGlobals.js';
 
+/**
+ * An error's stack (its message and frames) as text. Never its other fields,
+ * which may carry file data, and never throws, whatever was thrown.
+ */
+function describeError(error) {
+  try {
+    return error?.stack || String(error);
+  } catch {
+    return '(unprintable)';
+  }
+}
+
+/**
+ * Sends this window's uncaught errors and unhandled rejections to main as
+ * [unhandled]. No preventDefault(), so DevTools still shows them.
+ */
+function reportUnhandledErrors(target, logger) {
+  target.addEventListener('error', (event) =>
+    logger.unhandled(
+      describeError(
+        event.error ?? `${event.message} (${event.filename}:${event.lineno}:${event.colno})`
+      )
+    )
+  );
+  target.addEventListener('unhandledrejection', (event) =>
+    logger.unhandled(describeError(event.reason))
+  );
+}
+
 export function bootstrap() {
   const api = new DissonanceApi(window.dissonance);
   const logger = new TerminalLogger(window.dissonance);
+  // First, so a failure while wiring the app below is reported too.
+  reportUnhandledErrors(window, logger);
   logger.log('Renderer DOMContentLoaded');
 
   if (!api.isAvailable()) {

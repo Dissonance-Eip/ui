@@ -3,6 +3,7 @@ import { UiLogForwarder } from '../ipcHandlers/UiLogForwarder.js';
 import { makeIpc, makeWebContents } from './helpers/fakeElectron.js';
 
 const UI_LOG = 'ui:log';
+const DROPPED = '[UI] (invalid log payload dropped)';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -23,52 +24,47 @@ function setup() {
 }
 
 describe('UiLogForwarder', () => {
-  it.each(['log', 'warn', 'error'])(
-    'prints a renderer %s line at that level with [UI]',
-    (level) => {
-      const { send, console: spies } = setup();
-
-      send({ level, message: 'hello' });
-
-      expect(spies[level]).toHaveBeenCalledWith('[UI] hello');
-    }
-  );
-
-  it('prints at log level when the level is missing or unknown', () => {
+  it('prints a renderer log line with [UI]', () => {
     const { send, console: spies } = setup();
 
-    send({ message: 'no level' });
-    send({ level: 'shout', message: 'odd level' });
+    send({ level: 'log', message: 'hello' });
 
-    expect(spies.log).toHaveBeenCalledWith('[UI] no level');
-    expect(spies.log).toHaveBeenCalledWith('[UI] odd level');
+    expect(spies.log).toHaveBeenCalledWith('[UI] hello');
   });
 
-  it('prints an empty line for a payload without a message', () => {
+  it.each(['warn', 'error'])('prints a renderer %s line as [handled] with [UI]', (level) => {
     const { send, console: spies } = setup();
 
-    send(undefined);
+    send({ level, message: 'hello' });
 
-    expect(spies.log).toHaveBeenCalledWith('[UI] ');
+    expect(spies[level]).toHaveBeenCalledWith('[handled]', '[UI] hello');
   });
 
-  it('turns a non-string message into text', () => {
+  it('prints an error nothing caught in the renderer as [unhandled]', () => {
     const { send, console: spies } = setup();
 
-    send({ level: 'warn', message: 42 });
+    send({ level: 'unhandled', message: 'Error: boom\n    at file:///renderer/app.js:1:1' });
 
-    expect(spies.warn).toHaveBeenCalledWith('[UI] 42');
+    expect(spies.error).toHaveBeenCalledWith(
+      '[unhandled]',
+      '[UI] Error: boom\n    at file:///renderer/app.js:1:1'
+    );
   });
 
-  it('never throws on a message that cannot become text', () => {
+  it.each([
+    ['no payload', undefined],
+    ['a payload that is not an object', 'hello'],
+    ['a missing level', { message: 'no level' }],
+    ['an unknown level', { level: 'shout', message: 'odd level' }],
+    ['a message that is not text', { level: 'warn', message: 42 }],
+    ['a missing message', { level: 'log' }],
+  ])('drops a payload with %s and says so', (_case, payload) => {
     const { send, console: spies } = setup();
-    const unprintable = {
-      toString() {
-        throw new Error('no text');
-      },
-    };
 
-    expect(() => send({ message: unprintable })).not.toThrow();
-    expect(spies.error).toHaveBeenCalledWith('[UI] (log forwarding failed)', expect.any(Error));
+    expect(() => send(payload)).not.toThrow();
+
+    expect(spies.warn).toHaveBeenCalledWith('[handled]', DROPPED);
+    expect(spies.log).not.toHaveBeenCalled();
+    expect(spies.error).not.toHaveBeenCalled();
   });
 });

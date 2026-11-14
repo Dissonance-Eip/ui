@@ -24,6 +24,18 @@ function logToMain(level, message) {
   ipcRenderer.send('ui:log', { level, message: String(message) });
 }
 
+/**
+ * An error's stack (its message and frames) as text, like main/logger.js
+ * (which this sandbox can't require). Never throws, whatever was thrown.
+ */
+function describeError(error) {
+  try {
+    return error?.stack || String(error);
+  } catch {
+    return '(unprintable)';
+  }
+}
+
 logToMain('log', 'Preload script loaded (ui/preload.js)');
 
 /**
@@ -36,7 +48,8 @@ function answerRequests(requestChannel, doneChannel, cb) {
     try {
       await cb(request);
     } catch (e) {
-      logToMain('error', `${requestChannel} handler failed: ${e && e.stack ? e.stack : e}`);
+      // The app's callback let it through: caught here only to still answer.
+      logToMain('unhandled', `${requestChannel} handler failed: ${describeError(e)}`);
     } finally {
       ipcRenderer.send(doneChannel, { requestId: request && request.requestId });
     }
@@ -45,8 +58,19 @@ function answerRequests(requestChannel, doneChannel, cb) {
   return () => ipcRenderer.removeListener(requestChannel, handler);
 }
 
+/**
+ * Subscribe `cb` to a main → renderer event. A callback that throws or
+ * rejects fails in this isolated world, outside the renderer's window
+ * listeners, so it is reported here. Returns an unsubscribe function.
+ */
 function subscribe(channel, cb) {
-  const handler = (_event, data) => cb(data);
+  const handler = async (_event, data) => {
+    try {
+      await cb(data);
+    } catch (e) {
+      logToMain('unhandled', `${channel} subscriber failed: ${describeError(e)}`);
+    }
+  };
   ipcRenderer.on(channel, handler);
   return () => ipcRenderer.removeListener(channel, handler);
 }
