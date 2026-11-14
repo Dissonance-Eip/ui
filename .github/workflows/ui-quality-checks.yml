@@ -1,9 +1,10 @@
 name: UI Quality Checks
 
 on:
+  # Branches are checked through their pull request; main is checked again after each merge.
   push:
     branches:
-      - '**'
+      - main
   pull_request:
     branches:
       - '**'

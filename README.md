@@ -87,7 +87,7 @@ npm test               # vitest run (unit tests + addon integration test)
 npm run build          # electron-builder --dir (unpacked .app for testing)
 ```
 
-All four are gated by CI on every push/PR.
+All four are gated by CI on every pull request and on every push to `main`.
 
 For an interactive test loop: `npm run test:watch`.
 
