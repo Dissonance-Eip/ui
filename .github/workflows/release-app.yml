@@ -88,6 +88,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Dissonance ${{ github.ref_name }}
+          # vX.Y.Z-rc.N is a release candidate for testers.
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
           files: artifacts/**/*
           body: |
             Multi-platform Dissonance desktop app.

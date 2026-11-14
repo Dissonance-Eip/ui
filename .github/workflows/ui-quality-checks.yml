@@ -26,10 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     # SonarQube Cloud (docs#78) reuses the coverage report below. The scan is
     # skipped until the SONAR_TOKEN secret exists. It runs on pull requests and
-    # on pushes to dev (the Sonar main branch): the free plan analyses nothing else.
+    # on pushes to main (the Sonar main branch): the free plan analyses nothing else.
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_name == 'dev')) }}
+      SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_name == 'main')) }}
 
     steps:
       - name: Checkout repository

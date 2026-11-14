@@ -6,7 +6,9 @@ repository: [Contributing to Dissonance](https://github.com/Dissonance-Eip/docs/
 The short version for this repository:
 
 - Start from an issue and branch from it.
-- Branch from `dev` and open your pull request against `dev`, not `main`.
+- Branch from `main` and open your pull request against `main`. `main` is the
+  only long-lived branch; see the
+  [development workflow](https://github.com/Dissonance-Eip/docs/blob/main/planning/development-workflow.md).
 - Before pushing, run `npm run lint`, `npm run format:check`, `npm test` and
   `npm run build`.
 
