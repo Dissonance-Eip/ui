@@ -181,7 +181,7 @@ A relative path is resolved against the directory you launch from.
 
 ### Syncing binaries from the core repo
 
-The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts from the most recent core GitHub Release into `Build/Release/`. It fires automatically on push to `dev` and on `repository_dispatch` from core's `release-addon.yml`. To trigger manually: run the workflow from the Actions tab.
+The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts from the most recent core GitHub Release into `Build/Release/`. It fires automatically on push to `main` and on `repository_dispatch` from core's `release-addon.yml`. To trigger manually: run the workflow from the Actions tab.
 
 ---
 
