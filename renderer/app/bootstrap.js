@@ -1,18 +1,66 @@
+/**
+ * Renderer composition root.
+ *
+ * Wires up the entire app on DOMContentLoaded:
+ *   - api (DissonanceApi over the preload bridge)
+ *   - logger (TerminalLogger → main process console), which also reports
+ *     errors nothing caught (window `error` / `unhandledrejection`)
+ *   - SystemThemeWatcher (Tailwind dark-mode toggle, stopped with the controller)
+ *   - ViewRouter (upload / analyze / compare)
+ *   - AppState (current + processed file paths)
+ *   - WavMetadataService (response → display-friendly shape)
+ *   - UploadView, AnalyzeView, CompareView (constructed with their DOM nodes)
+ *   - AppController.start() — registers all event handlers + flush flow
+ *
+ * In development only, exposes the controller + logger on window for
+ * DevTools poking (see debugGlobals.js).
+ */
 import { TerminalLogger } from '../infrastructure/TerminalLogger.js';
 import { DissonanceApi } from '../infrastructure/DissonanceApi.js';
 import { ViewRouter } from '../infrastructure/ViewRouter.js';
+import { SystemThemeWatcher } from '../infrastructure/SystemThemeWatcher.js';
 import { AppState } from '../state/AppState.js';
 import { UploadView } from '../views/UploadView.js';
 import { AnalyzeView } from '../views/AnalyzeView.js';
-import { ProcessView } from '../views/ProcessView.js';
 import { CompareView } from '../views/CompareView.js';
-import { ExportView } from '../views/ExportView.js';
 import { AppController } from '../controllers/AppController.js';
 import { WavMetadataService } from '../services/WavMetadataService.js';
+import { exposeDebugGlobals } from './debugGlobals.js';
+
+/**
+ * An error's stack (its message and frames) as text. Never its other fields,
+ * which may carry file data, and never throws, whatever was thrown.
+ */
+function describeError(error) {
+  try {
+    return error?.stack || String(error);
+  } catch {
+    return '(unprintable)';
+  }
+}
+
+/**
+ * Sends this window's uncaught errors and unhandled rejections to main as
+ * [unhandled]. No preventDefault(), so DevTools still shows them.
+ */
+function reportUnhandledErrors(target, logger) {
+  target.addEventListener('error', (event) =>
+    logger.unhandled(
+      describeError(
+        event.error ?? `${event.message} (${event.filename}:${event.lineno}:${event.colno})`
+      )
+    )
+  );
+  target.addEventListener('unhandledrejection', (event) =>
+    logger.unhandled(describeError(event.reason))
+  );
+}
 
 export function bootstrap() {
   const api = new DissonanceApi(window.dissonance);
   const logger = new TerminalLogger(window.dissonance);
+  // First, so a failure while wiring the app below is reported too.
+  reportUnhandledErrors(window, logger);
   logger.log('Renderer DOMContentLoaded');
 
   if (!api.isAvailable()) {
@@ -22,12 +70,15 @@ export function bootstrap() {
 
   logger.log('dissonance API available from preload');
 
+  // Watch OS-level light/dark mode and apply Tailwind `dark` class.
+  const themeWatcher = new SystemThemeWatcher({ api, logger });
+  themeWatcher.start().catch((e) => logger.error(`System theme watcher failed: ${e}`));
+
   const router = new ViewRouter({
     upload: document.getElementById('view-upload'),
     analyze: document.getElementById('view-analyze'),
-    process: document.getElementById('view-process'),
+    processing: document.getElementById('view-processing'),
     compare: document.getElementById('view-compare'),
-    export: document.getElementById('view-export'),
   });
 
   const state = new AppState();
@@ -37,20 +88,19 @@ export function bootstrap() {
     dropZoneEl: document.getElementById('dropZone'),
     api,
     logger,
+    getLastFilePath: () => state.lastImportedFilePath,
   });
 
   const analyzeView = new AnalyzeView({
     selectedFileEl: document.getElementById('analyzeSelectedFile'),
     changeFileBtn: document.getElementById('analyzeChangeFileBtn'),
-    metaFilenameEl: document.getElementById('analyzeMetaFilename'),
     metaDurationEl: document.getElementById('analyzeMetaDuration'),
     metaSampleRateEl: document.getElementById('analyzeMetaSampleRate'),
     metaChannelsEl: document.getElementById('analyzeMetaChannels'),
-    nextBtn: document.getElementById('analyzeNextBtn'),
-  });
-
-  const processView = new ProcessView({
-    selectedFileEl: document.getElementById('processSelectedFile'),
+    waveformEl: document.getElementById('analyzeWaveform'),
+    tagInputEls: document.querySelectorAll('[data-tag]'),
+    processingModeEls: document.querySelectorAll('[data-processing-mode]'),
+    processingModeLabelEl: document.getElementById('processingModesLabel'),
     processBtn: document.getElementById('processBtn'),
   });
 
@@ -59,16 +109,15 @@ export function bootstrap() {
     origDurationEl: document.getElementById('compareOrigDuration'),
     origSampleRateEl: document.getElementById('compareOrigSampleRate'),
     origChannelsEl: document.getElementById('compareOrigChannels'),
+    origWaveformEl: document.getElementById('compareOrigWaveform'),
     procFilenameEl: document.getElementById('compareProcFilename'),
     procDurationEl: document.getElementById('compareProcDuration'),
     procSampleRateEl: document.getElementById('compareProcSampleRate'),
     procChannelsEl: document.getElementById('compareProcChannels'),
-    nextBtn: document.getElementById('compareNextBtn'),
-  });
-
-  const exportView = new ExportView({
-    selectedFileEl: document.getElementById('exportSelectedFile'),
-    exportBtn: document.getElementById('exportBtn'),
+    procModesEl: document.getElementById('compareProcModes'),
+    procIntensityEl: document.getElementById('compareProcIntensity'),
+    procWaveformEl: document.getElementById('compareProcWaveform'),
+    exportBtn: document.getElementById('compareExportBtn'),
   });
 
   const controller = new AppController({
@@ -78,15 +127,19 @@ export function bootstrap() {
     state,
     uploadView,
     analyzeView,
-    processView,
     compareView,
-    exportView,
+    headerEl: document.getElementById('appHeader'),
+    restartBtn: document.getElementById('restartBtn'),
     wavMetadataService,
   });
 
   controller.start();
+  controller.track(() => themeWatcher.stop());
 
-  // Expose for debugging in DevTools
-  window.__logger = logger;
-  window.__app = controller;
+  exposeDebugGlobals({
+    target: window,
+    isDevelopment: api.isDevelopment(),
+    logger,
+    controller,
+  });
 }

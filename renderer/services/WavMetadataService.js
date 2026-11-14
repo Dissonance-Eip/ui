@@ -1,41 +1,36 @@
 import { basename } from '../utils/pathUtils.js';
 
+/**
+ * Converts core:readMetadata responses into the display-friendly shape
+ * used by AnalyzeView/CompareView:
+ *   { filename, sampleRate, channels, durationSec, tags }
+ * Gracefully handles a missing `audio` block (returns blanks) so the UI
+ * can show a placeholder while metadata is still loading.
+ */
 export class WavMetadataService {
-  toBasicInfoFromInspect(filePath, inspectResponse) {
-    const meta = inspectResponse && inspectResponse.metadata ? inspectResponse.metadata : null;
-    return this.toBasicInfo(filePath, meta);
+  /**
+   * Convenience adapter: unwraps a `core:readMetadata` IPC response
+   * `{ ok, audio, tags }` into the basicInfo shape.
+   * Missing/`null` blocks default to `null`/`{}` rather than throwing.
+   */
+  toBasicInfoFromMetadata(filePath, metadataResponse) {
+    const audio = metadataResponse && metadataResponse.audio ? metadataResponse.audio : null;
+    const tags = metadataResponse && metadataResponse.tags ? metadataResponse.tags : {};
+    return this.toBasicInfo(filePath, audio, tags);
   }
 
-  toBasicInfoFromProcess(filePath, processResponse) {
-    const meta = processResponse && processResponse.metadata ? processResponse.metadata : null;
-    return this.toBasicInfo(filePath, meta);
-  }
-
-  toBasicInfo(filePath, meta) {
+  /**
+   * @returns {{filename: string|null, sampleRate: number|null, channels: number|null,
+   *           durationSec: number|null, tags: object}}
+   *          Numeric fields are `null` when the audio block is missing or
+   *          malformed — callers render these as `—` placeholders.
+   */
+  toBasicInfo(filePath, audio, tags = {}) {
     const filename = basename(filePath);
-    const sampleRate = meta && typeof meta.sampleRate === 'number' ? meta.sampleRate : null;
-    const channels = meta && typeof meta.numChannels === 'number' ? meta.numChannels : null;
-    const durationSec = this._durationSec(meta, sampleRate, channels);
+    const sampleRate = audio && typeof audio.sampleRate === 'number' ? audio.sampleRate : null;
+    const channels = audio && typeof audio.numChannels === 'number' ? audio.numChannels : null;
+    const durationSec = audio && typeof audio.durationSec === 'number' ? audio.durationSec : null;
 
-    return { filename, durationSec, sampleRate, channels };
-  }
-
-  _durationSec(meta, sampleRate, channels) {
-    if (!meta || !sampleRate || !channels) return null;
-
-    if (typeof meta.numSamples === 'number') {
-      const frames = meta.numSamples / channels;
-      return frames / sampleRate;
-    }
-
-    if (typeof meta.subchunk2Size === 'number' && meta.bitsPerSample) {
-      const bytesPerSample = meta.bitsPerSample / 8;
-      if (bytesPerSample > 0) {
-        const totalSamples = meta.subchunk2Size / bytesPerSample;
-        return totalSamples / (channels * sampleRate);
-      }
-    }
-
-    return null;
+    return { filename, sampleRate, channels, durationSec, tags };
   }
 }

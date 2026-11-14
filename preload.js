@@ -1,26 +1,105 @@
+/**
+ * Preload script — bridges the sandboxed renderer to the main process.
+ *
+ * Everything the renderer can ask the OS / native code to do goes through
+ * `window.dissonance.*` exposed here via contextBridge. Each method maps to
+ * an ipcRenderer.invoke (request/response) or ipcRenderer.on (subscription
+ * with an unsubscribe function returned).
+ *
+ * SECURITY: contextIsolation is on; node integration is off. The renderer
+ * never sees `require`, `process`, or any Node API directly.
+ */
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-console.log('Preload script loaded (ui/preload.js)');
+// Set by main for development builds only (main/windowSecurity.js
+// DEV_MODE_ARG). A sandboxed preload cannot require that module, hence
+// the literal.
+const IS_DEVELOPMENT = process.argv.includes('--dissonance-dev');
+
+/**
+ * Logs through main's UiLogForwarder (the terminal), like the renderer's
+ * TerminalLogger; the sandboxed preload can't require main/logger.js.
+ */
+function logToMain(level, message) {
+  ipcRenderer.send('ui:log', { level, message: String(message) });
+}
+
+/**
+ * An error's stack (its message and frames) as text, like main/logger.js
+ * (which this sandbox can't require). Never throws, whatever was thrown.
+ */
+function describeError(error) {
+  try {
+    return error?.stack || String(error);
+  } catch {
+    return '(unprintable)';
+  }
+}
+
+logToMain('log', 'Preload script loaded (ui/preload.js)');
+
+/**
+ * Subscribe `cb` to a main → renderer request. Once `cb` settles, answer on
+ * `doneChannel` with the request's id so main knows THIS window is done
+ * (see ipcHandlers/rendererMessaging.js). Returns an unsubscribe function.
+ */
+function answerRequests(requestChannel, doneChannel, cb) {
+  const handler = async (_event, request) => {
+    try {
+      await cb(request);
+    } catch (e) {
+      // The app's callback let it through: caught here only to still answer.
+      logToMain('unhandled', `${requestChannel} handler failed: ${describeError(e)}`);
+    } finally {
+      ipcRenderer.send(doneChannel, { requestId: request && request.requestId });
+    }
+  };
+  ipcRenderer.on(requestChannel, handler);
+  return () => ipcRenderer.removeListener(requestChannel, handler);
+}
+
+/**
+ * Subscribe `cb` to a main → renderer event. A callback that throws or
+ * rejects fails in this isolated world, outside the renderer's window
+ * listeners, so it is reported here. Returns an unsubscribe function.
+ */
+function subscribe(channel, cb) {
+  const handler = async (_event, data) => {
+    try {
+      await cb(data);
+    } catch (e) {
+      logToMain('unhandled', `${channel} subscriber failed: ${describeError(e)}`);
+    }
+  };
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
+}
 
 contextBridge.exposeInMainWorld('dissonance', {
-  openFile: () => ipcRenderer.invoke('dialog:openFile'),
+  openFile: (lastFilePath) => ipcRenderer.invoke('dialog:openFile', lastFilePath),
+  getSystemTheme: () => ipcRenderer.invoke('ui:getSystemTheme'),
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file);
-    } catch (_e) {
+    } catch (e) {
+      logToMain('warn', `Could not resolve the dropped file's path: ${e}`);
       return null;
     }
   },
-  getFileStats: (filePath) => ipcRenderer.invoke('file:getStats', filePath),
-  inspectFile: (filePath) => ipcRenderer.invoke('core:inspect', filePath),
-  processFile: (filePath) => ipcRenderer.invoke('core:process', filePath),
+  readFileMetadata: (filePath) => ipcRenderer.invoke('core:readMetadata', filePath),
+  processFile: (filePath, options) => ipcRenderer.invoke('core:process', { filePath, options }),
+  writeTags: (filePath, tags) => ipcRenderer.invoke('core:writeTags', { filePath, tags }),
   exportFile: (processedPath) => ipcRenderer.invoke('core:export', processedPath),
   cleanupProcessedFile: (processedPath) =>
     ipcRenderer.invoke('core:cleanupProcessed', processedPath),
-  logToMain: (level, message) => ipcRenderer.send('ui:log', { level, message }),
-  onCoreStatus: (cb) => {
-    const handler = (_event, data) => cb(data);
-    ipcRenderer.on('core:status', handler);
-    return () => ipcRenderer.removeListener('core:status', handler);
-  },
+  onAppFlushRequest: (cb) => answerRequests('app:flushRequest', 'app:flushDone', () => cb()),
+  onPauseFileRequest: (cb) =>
+    answerRequests('player:pauseFileRequest', 'player:pauseFileDone', (request) =>
+      cb({ filePath: request && request.filePath })
+    ),
+  onTagsWrittenElsewhere: (cb) => subscribe('tags:writtenElsewhere', cb),
+  logToMain,
+  onCoreStatus: (cb) => subscribe('core:status', cb),
+  onSystemTheme: (cb) => subscribe('ui:systemTheme', cb),
+  isDevelopment: () => IS_DEVELOPMENT,
 });

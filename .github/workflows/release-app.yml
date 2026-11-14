@@ -1,0 +1,109 @@
+name: Release App
+
+# Builds the Dissonance desktop app on each platform's native runner
+# (electron-builder can't cross-build installers) and publishes them to a
+# single GitHub release. Triggered by pushing a v* tag; workflow_dispatch
+# builds the installers as artifacts without publishing, for testing.
+#
+# The platform-native core addon (.node) is expected to already be committed
+# under Build/Release/ (kept current by sync-core-addon.yml). The macOS build
+# is Apple Silicon (arm64) only — matches the single darwin-arm64 addon the
+# core repo ships.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            runner: macos-latest
+            artifact_glob: |
+              dist/*.dmg
+              dist/*.zip
+          - os: windows
+            # Pinned to windows-2022 for the same reason the core repo pins it:
+            # windows-latest (2025) ships a VS version older toolchains trip on.
+            runner: windows-2022
+            artifact_glob: |
+              dist/*.exe
+          - os: linux
+            runner: ubuntu-latest
+            artifact_glob: |
+              dist/*.AppImage
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build distributables
+        run: npm run dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Dissonance ${{ github.ref_name }}
+          # vX.Y.Z-rc.N is a release candidate for testers.
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          files: artifacts/**/*
+          body: |
+            Multi-platform Dissonance desktop app.
+
+            ## Assets
+            - `*.dmg` / `*.zip` — macOS (Apple Silicon)
+            - `*.exe` — Windows (x64) installer
+            - `*.AppImage` — Linux (x64)
+
+            Bundles the core audio addon with the current psychoacoustic
+            masking model.
+
+            ## Notes
+            - Builds are unsigned/unnotarized — macOS Gatekeeper and Windows
+              SmartScreen will warn on first launch (macOS: right-click → Open;
+              Windows: More info → Run anyway).
+            - macOS is Apple Silicon only; no Intel build.

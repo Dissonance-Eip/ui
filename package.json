@@ -1,30 +1,91 @@
 {
-  "name": "dissonance-ui",
-  "version": "0.1.0",
+  "name": "Dissonance",
+  "productName": "Dissonance",
+  "version": "0.1.1",
   "private": true,
-  "description": "Dissonance UI Electron shell (JavaScript only)",
+  "description": "Silencing AI, Preserving Sound",
   "main": "main.js",
   "scripts": {
+    "build:css": "tailwindcss -i ./tailwind.input.css -o ./tailwind.css",
+    "watch:css": "tailwindcss -i ./tailwind.input.css -o ./tailwind.css --watch",
+    "prestart": "npm run build:css",
+    "predev": "npm run build:css",
+    "prebuild": "npm run build:css",
     "start": "electron .",
     "dev": "electron .",
+    "dev:with-core": "npm run build:core && npm run build:css && DISSONANCE_CORE_ADDON_PATH=../core/build/Release/dissonance_core.node electron .",
+    "build:core": "cd ../core && npm run build",
+    "check:peers": "check-peer-dependencies --npm --findSolutions --ignore keyv",
+    "check:deps": "depcheck --ignores=@arraypress/waveform-player,tailwindcss --skip-missing",
+    "check:updates": "ncu",
+    "check:audit": "npm audit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check .",
+    "prepare": "husky",
     "build": "electron-builder --dir",
-    "test": "echo \"No tests yet\""
+    "predist": "npm run build:css",
+    "dist": "electron-builder --publish never",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "",
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "build": {
+    "appId": "com.dissonanceeip.dissonance",
+    "productName": "Dissonance",
+    "directories": {
+      "buildResources": "resources"
+    },
+    "mac": {
+      "icon": "resources/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "resources/icon.png",
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "icon": "resources/icon.png",
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo"
+    }
+  },
   "dependencies": {
+    "@arraypress/waveform-player": "^1.5.2",
     "bindings": "^1.5.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.0",
-    "electron": "^40.6.0",
-    "electron-builder": "^26.8.1",
-    "eslint": "^10.0.1",
-    "globals": "^17.3.0",
-    "prettier": "^3.6.2"
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/cli": "^4.3.3",
+    "@vitest/coverage-v8": "^4.1.12",
+    "check-peer-dependencies": "^5.0.0",
+    "depcheck": "^1.4.7",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "npm-check-updates": "^23.1.0",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4.3.3",
+    "vitest": "^4.1.7"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write --ignore-unknown"
+    ],
+    "!(*.{js,mjs,cjs})": "prettier --write --ignore-unknown"
   }
 }

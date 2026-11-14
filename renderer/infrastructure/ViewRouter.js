@@ -1,7 +1,11 @@
+/**
+ * Show-one-hide-others switcher for the three top-level view sections
+ * (upload / analyze / compare). Constructed with a `{ name → element }`
+ * map; show(name) flips the `hidden` attribute on each section.
+ */
 export class ViewRouter {
   constructor(views) {
     this.views = views;
-    this.current = null;
   }
 
   show(name) {
@@ -9,10 +13,5 @@ export class ViewRouter {
       if (!el) continue;
       el.hidden = key !== name;
     }
-    this.current = name;
-  }
-
-  getCurrent() {
-    return this.current;
   }
 }

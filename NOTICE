@@ -1,0 +1,8 @@
+Dissonance (ui)
+Copyright 2025-2026 Noé Kurata and Luca Martinet
+
+This product includes software developed for the Dissonance project
+(https://github.com/Dissonance-Eip/ui).
+
+The compiled audio engine addon distributed in Build/Release/*.node is
+proprietary software and is not covered by the Apache License, Version 2.0.

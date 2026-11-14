@@ -1,6 +1,6 @@
-# Renderer Architecture (OOP)
+# Renderer Architecture
 
-This UI is organized as a small OOP/MVC-ish structure where:
+Small OOP/MVC-ish structure where:
 
 - **Controllers** orchestrate flows and side effects.
 - **Views** own DOM bindings and view-level UI updates.
@@ -8,30 +8,46 @@ This UI is organized as a small OOP/MVC-ish structure where:
 - **Services** implement pure(ish) domain logic.
 - **Infrastructure** wraps platform/bridge concerns.
 
+A view IS a component — same lifecycle, same listener tracking, same dispose. Both extend `BaseComponent` directly. There is no separate `BaseView` class.
+
 ## Folder map
 
 - `renderer/app/`
-  - `bootstrap.js`: composition root for the renderer.
+  - `bootstrap.js` — composition root for the renderer. The only place that constructs and wires dependencies. Also sends the window's uncaught errors and unhandled rejections to main as `unhandled` log lines.
 - `renderer/base/`
-  - `Disposable.js`: tracks cleanups/unsubscribes.
-  - `BaseController.js`, `BaseView.js`, `BaseComponent.js`: lifecycle + safe event wiring.
-  - `BaseApi.js`: safe bridge method calling.
+  - `Disposable.js` — tracks cleanups/unsubscribes in LIFO order. A failing cleanup doesn't stop the rest; `dispose()` then throws an `AggregateError` of the failures.
+  - `BaseComponent.js` — mount/unmount lifecycle + tracked `listen()` for events.
+  - `BaseController.js` — start() hook on top of Disposable; `dispose()` tears it down.
+  - `BaseApi.js` — defensive wrapper around the preload bridge.
+  - `Logger.js` — interface only; documents the Logger contract.
 - `renderer/infrastructure/`
-  - `DissonanceApi.js`: preload bridge wrapper.
-  - `TerminalLogger.js`: logs to main process or console.
-  - `ViewRouter.js`: toggles views by name.
+  - `DissonanceApi.js` — typed-ish facade over `window.dissonance` (preload bridge).
+  - `TerminalLogger.js` — forwards log lines to the main process via `ui:log`. In the terminal, `error()` lines read `[handled] [UI] …` and `unhandled()` lines `[unhandled] [UI] …`.
+  - `SystemThemeWatcher.js` — bridges OS light/dark mode into the renderer, toggles Tailwind `dark` class, dispatches `dissonance:theme` events.
+  - `ViewRouter.js` — show-one-hide-others switcher for the three top-level views.
 - `renderer/controllers/`
-  - `AppController.js`: application orchestration.
+  - `AppController.js` — thin coordinator: builds the flows below and wires view, window and main-process events (quit flush, multi-window pause/refresh, core status) to them.
+  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard.
+  - `ProcessingFlow.js` — process → Compare, export, restart; the operation id that discards a result arriving after a restart.
+  - `TagEditSession.js` — the TagWriteQueue, playback↔queue coordination, what a form snapshot may write (#111), and the pause-and-flush chokepoint.
+  - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.
 - `renderer/views/`
-  - `WelcomeView.js`, `MainView.js`: view-specific UI updates and event wiring.
+  - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
+  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button. Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
+  - `CompareView.js` — original vs processed waveforms + info panels + export button.
+  - `renderWavInfo.js` — writes a WAV info panel (filename, duration, sample rate, channels); shared by AnalyzeView and CompareView.
 - `renderer/components/`
-  - `DropZone.js`: reusable drag/drop + click-to-open component.
+  - `DropZone.js` — drag/drop + click-to-open file picker. Falls back to the native dialog when a dropped file has no resolvable path.
+  - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, in-place theme repaint (keeps the player and its audio, so playback continues), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
 - `renderer/services/`
-  - `WavMetadataService.js`: metadata normalization (duration/channels/sample-rate, etc).
+  - `TagWriteQueue.js` — serialised, blockable queue for writing WAV tag metadata. Per-snapshot filePath, flush-on-quit, error recovery.
+  - `fileSelection.js` — `promptForFile()` (open dialog) and `resolveDroppedPath()`; every file pick goes through them, so a file-type check belongs here.
+  - `WavMetadataService.js` — converts `core:readMetadata` responses into the display-friendly basicInfo shape.
 - `renderer/state/`
-  - `AppState.js`: minimal app state.
+  - `AppState.js` — current + processed file paths. `setCurrentFilePath` deliberately clears `processedFilePath`.
 - `renderer/utils/`
-  - `pathUtils.js`: small helpers.
+  - `pathUtils.js` — `basename()` for absolute paths (POSIX + Windows).
+  - `wavInfoFormatters.js` — display formatters for duration, sample rate, channels.
 
 ## Conventions
 
@@ -42,12 +58,38 @@ This UI is organized as a small OOP/MVC-ish structure where:
   - Update `state`.
   - Decide what to render.
 - **Lifecycle**:
-  - Anything that subscribes (event listener, IPC callback) should be tracked via `track()` so it is cleaned up on `unmount()`/`stop()`.
+  - Anything that subscribes (event listener, IPC callback) should be tracked via `track()` so it is cleaned up on `unmount()` / `dispose()`.
+- **File-level docstrings**: every module has a header comment explaining its role and any non-obvious gotchas. Per-function JSDoc only where the signature doesn't already tell you the contract (side effects, null semantics, etc.).
 
-## Example: adding a new feature
+## Adding a new feature
 
-1. Add logic in a service (`renderer/services/...`).
-2. Add UI wiring in a view/component.
-3. Orchestrate it in a controller.
+1. Add domain logic in a service (`renderer/services/...`) — pure if possible, testable in isolation.
+2. Add DOM wiring in a view/component.
+3. Orchestrate it in `AppController`.
+4. Wire the new DOM refs in `app/bootstrap.js`.
 
-Keep `renderer/app/bootstrap.js` as the only place that constructs and wires all dependencies.
+## Waveform playback
+
+The Analyze view and the Compare view both display waveforms via the `WaveformPreview` component, which wraps `@arraypress/waveform-player`. The component encapsulates:
+
+- Player create / `loadTrack` / destroy lifecycle.
+- Suppression of `WaveformPlayer.loadTrack()`'s unconditional auto-play (it replaces `.play` with a no-op for the duration of the call, then restores).
+- `file://` URL conversion for absolute paths via `renderer/utils/fileUrl.js`, which percent-encodes each path segment so names with `#`, `?`, `%`, spaces or non-ASCII characters load correctly (POSIX, Windows drive and UNC paths).
+- In-place theme repaint on `dissonance:theme`: the new colours (`renderer/utils/waveformColors.js`) are applied to the live player and its canvas is redrawn. The player and its audio element are kept, so playback never pauses, restarts or reloads the file.
+- Hold-and-drag scrubbing via pointer events on the canvas (the library only ships click-to-seek).
+- Audio `play` / `pause` / `ended` event forwarding via `onPlaybackStateChange`, used by `AppController` to toggle the TagWriteQueue's blocked state.
+
+The CSP in `index.html` allows local audio loading for preview (`media-src file:` and `connect-src file:`).
+
+## Tag editing flow
+
+When the user edits a tag input:
+
+1. `blur` fires on the input → `AnalyzeView.onTagBlur` callback fires with the full snapshot of all seven tag fields.
+2. `AppController` enqueues the snapshot for the current file path via `TagWriteQueue.enqueue(filePath, tags)`.
+3. If the queue is unblocked (audio paused), the write fires immediately on `core:writeTags`.
+4. If the queue is blocked (audio playing), the snapshot replaces any previous pending snapshot. Multiple blurs while playing collapse into the latest snapshot.
+5. When audio pauses or ends, `onPlaybackStateChange(false)` unblocks the queue, which auto-drains the pending snapshot.
+6. On file-switch, process, or quit, `_pauseAndFlushTags()` pauses every preview, snapshots the current form (catches any blur the OS swallowed), and awaits `queue.flush()`.
+
+Per-snapshot filePath means a queued write for File A still goes to File A even if the user has since switched to File B. Serialised writes mean the underlying read-modify-write can never be raced.

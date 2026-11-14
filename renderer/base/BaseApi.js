@@ -1,3 +1,9 @@
+/**
+ * Thin wrapper over a preload-exposed bridge object.
+ * Subclasses (e.g. DissonanceApi) add typed-ish methods that delegate to
+ * `_call(name, ...args)`, which checks the bridge is present and the
+ * named method exists before invoking it.
+ */
 export class BaseApi {
   constructor(bridge) {
     this.bridge = bridge;

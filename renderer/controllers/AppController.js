@@ -1,281 +1,187 @@
+/**
+ * Top-level renderer controller: a thin coordinator that builds the
+ * renderer's flows and wires view, window and main-process events to them.
+ *
+ *   • TagEditSession   — tag auto-save queue, form fill (#111), pause + flush
+ *   • ScreenNavigator  — upload / analyze / processing / compare, header, buttons
+ *   • FileImportFlow   — upload, change file, drop anywhere → Analyze + metadata
+ *   • ProcessingFlow   — process → Compare, export, restart, operation id
+ *
+ * Also handles the multi-window events: another window about to rewrite the
+ * shown file → pause its players; another window rewrote it → save own
+ * edits, re-read tags, reload the players (the audio data may have moved).
+ * The quit/close flush request pauses playback and drains the tag queue; the
+ * preload answers main once that settles.
+ */
 import { BaseController } from '../base/BaseController.js';
+import { FileImportFlow } from './FileImportFlow.js';
+import { ProcessingFlow } from './ProcessingFlow.js';
+import { ScreenNavigator } from './ScreenNavigator.js';
+import { TagEditSession } from './TagEditSession.js';
 
 export class AppController extends BaseController {
-  constructor({
-    api,
-    logger,
-    router,
-    state,
-    uploadView,
-    analyzeView,
-    processView,
-    compareView,
-    exportView,
-    wavMetadataService,
-  }) {
+  /**
+   * @param {object} deps the views, api, logger, router, state, headerEl,
+   *   restartBtn and wavMetadataService built by bootstrap.js.
+   *   eventTarget — where window-level drops are caught (default `window`).
+   */
+  constructor(deps) {
     super();
-    this.api = api;
-    this.logger = logger;
-    this.router = router;
-    this.state = state;
-    this.uploadView = uploadView;
-    this.analyzeView = analyzeView;
-    this.processView = processView;
-    this.compareView = compareView;
-    this.exportView = exportView;
-    this.wavMetadataService = wavMetadataService;
+    this.api = deps.api;
+    this.logger = deps.logger;
+    this.state = deps.state;
+    this.uploadView = deps.uploadView;
+    this.analyzeView = deps.analyzeView;
+    this.compareView = deps.compareView;
+    this.restartBtn = deps.restartBtn;
+    this.eventTarget = deps.eventTarget;
 
-    this._originalBasicInfo = null;
-    this._processedBasicInfo = null;
-
-    this._onGlobalDragOver = this._onGlobalDragOver.bind(this);
-    this._onGlobalDrop = this._onGlobalDrop.bind(this);
+    this.screens = new ScreenNavigator(deps);
+    this.tags = new TagEditSession({
+      ...deps,
+      pausePreviews: () => this.screens.pauseAllPreviews(),
+    });
+    this.processing = new ProcessingFlow({
+      ...deps,
+      tags: this.tags,
+      screens: this.screens,
+      getOriginalInfo: () => this.importer.originalInfo,
+      resetToUpload: () => this._resetToUpload(),
+    });
+    this.importer = new FileImportFlow({
+      ...deps,
+      tags: this.tags,
+      screens: this.screens,
+      discardProcessedFile: () => this.processing.discardProcessedFile(),
+    });
   }
 
   start() {
     super.start();
-    this.uploadView.mount();
-    this.track(() => this.uploadView.unmount());
-
-    this.analyzeView.mount();
-    this.track(() => this.analyzeView.unmount());
-
-    this.processView.mount();
-    this.track(() => this.processView.unmount());
-
-    this.compareView.mount();
-    this.track(() => this.compareView.unmount());
-
-    this.exportView.mount();
-    this.track(() => this.exportView.unmount());
-
-    this.router.show('upload');
-
-    this.uploadView.onFileImported((filePath, sourceLabel) => {
-      this.importFile(filePath, sourceLabel);
-    });
-
-    this.analyzeView.onChangeFile(async () => {
-      try {
-        this.logger?.setStatus?.('Opening file dialog...');
-        const filePath = await this.api.openFile();
-        if (!filePath) {
-          this.logger?.log?.('No file selected');
-          this.logger?.setStatus?.('Import canceled');
-          return;
-        }
-        this.importFile(filePath, 'Selected');
-      } catch (err) {
-        this.logger?.error?.(`Import failed: ${err}`);
-      }
-    });
-
-    this.analyzeView.onNext(() => {
-      if (!this.state.currentFilePath) return;
-      this._showProcess();
-    });
-
-    this.processView.onProcess(() => this.processCurrentFile());
-
-    this.compareView.onNext(() => {
-      if (!this.state.processedFilePath) return;
-      this._showExport();
-    });
-
-    this.exportView.onExport(() => this.exportProcessedFile());
-
-    // Prevent the browser/Electron from navigating to the dropped file.
-    window.addEventListener('dragover', this._onGlobalDragOver);
-    window.addEventListener('drop', this._onGlobalDrop);
-    this.track(() => window.removeEventListener('dragover', this._onGlobalDragOver));
-    this.track(() => window.removeEventListener('drop', this._onGlobalDrop));
-
-    // Listen for core status events from main via preload bridge
-    const unsubscribe = this.api.onCoreStatus((data) => {
-      const msg = data && data.message ? data.message : JSON.stringify(data);
-      this.logger?.log?.(`core:status — ${msg}`);
-    });
-    if (typeof unsubscribe === 'function') {
-      this.track(unsubscribe);
-    }
-
-    this._syncButtons();
+    this._mountViews();
+    this.screens.showUpload();
+    this._wireImport();
+    this._wireTags();
+    this._wireProcessing();
+    this._wireAppEvents();
+    this.screens.syncButtons();
     this.logger?.setStatus?.('Ready');
   }
 
+  _mountViews() {
+    for (const view of [this.uploadView, this.analyzeView, this.compareView]) {
+      view.mount();
+      this.track(() => view.unmount());
+    }
+  }
+
+  _wireImport() {
+    this.uploadView.onFileImported((filePath, sourceLabel) => {
+      this.importFile(filePath, sourceLabel);
+    });
+    this.analyzeView.onChangeFile(() => this.importer.changeFile());
+
+    // Prevent the browser/Electron from navigating to the dropped file.
+    const target = this.eventTarget ?? window;
+    const onDragOver = (e) => this.importer.handleWindowDragOver(e);
+    const onDrop = (e) => this.importer.handleWindowDrop(e);
+    target.addEventListener('dragover', onDragOver);
+    target.addEventListener('drop', onDrop);
+    this.track(() => target.removeEventListener('dragover', onDragOver));
+    this.track(() => target.removeEventListener('drop', onDrop));
+  }
+
+  _wireTags() {
+    // Each blur snapshots the form into the queue, which defers the write
+    // while audio plays and serialises writes so they can't corrupt the file.
+    this.analyzeView.onTagBlur((tags) => this.tags.saveBlurredForm(tags));
+    this.analyzeView.onPlaybackStateChange((isPlaying) => this.tags.setPlaying(isPlaying));
+  }
+
+  _wireProcessing() {
+    this.analyzeView.onProcess(() => this.processCurrentFile());
+    this.compareView.onExport(() => this.exportProcessedFile());
+    if (!this.restartBtn) return;
+    const onRestart = () => this.restart();
+    this.restartBtn.addEventListener('click', onRestart);
+    this.track(() => this.restartBtn.removeEventListener('click', onRestart));
+  }
+
+  _wireAppEvents() {
+    // Before this window closes or the app quits: pause playback and drain the queue.
+    this.track(this.api.onAppFlushRequest(() => this._pauseAndFlushTags()));
+    // Another window is rewriting the tags of a file (see TagWriteCoordinator).
+    this.track(this.api.onPauseFileRequest((request) => this.pauseIfShowing(request?.filePath)));
+    this.track(
+      this.api.onTagsWrittenElsewhere((event) => this.refreshAfterWriteElsewhere(event?.filePath))
+    );
+    this.track(
+      this.api.onCoreStatus((data) => {
+        const msg = data && data.message ? data.message : JSON.stringify(data);
+        this.logger?.log?.(`core:status — ${msg}`);
+      })
+    );
+  }
+
   importFile(filePath, sourceLabel) {
-    if (this.state.processedFilePath) {
-      // Best-effort cleanup of the previous processed temp file.
-      this.api.cleanupProcessedFile(this.state.processedFilePath).catch(() => {});
-    }
-
-    this.state.setCurrentFilePath(filePath);
-    this._originalBasicInfo = this.wavMetadataService.toBasicInfo(filePath, null);
-    this._processedBasicInfo = null;
-
-    this.analyzeView.setSelectedFile(filePath);
-    this.analyzeView.setBasicWavInfo(this._originalBasicInfo);
-    this.analyzeView.setNextEnabled(true);
-    this.processView.setSelectedFile(filePath);
-    this.exportView.setSelectedFile(null);
-
-    this.logger?.log?.(`${sourceLabel} file: ${filePath}`);
-    this.logger?.setStatus?.('File imported');
-
-    this._showAnalyze();
-
-    // Fetch WAV metadata immediately (does not create a processed file).
-    this._inspectCurrentFile(filePath);
+    return this.importer.importFile(filePath, sourceLabel);
   }
 
-  async _inspectCurrentFile(filePath) {
-    if (!filePath) return;
+  processCurrentFile() {
+    return this.processing.process();
+  }
+
+  exportProcessedFile() {
+    return this.processing.exportResult();
+  }
+
+  restart() {
+    return this.processing.restart();
+  }
+
+  /** The one tag-flush chokepoint; see TagEditSession.pauseAndFlush. */
+  _pauseAndFlushTags() {
+    return this.tags.pauseAndFlush();
+  }
+
+  _readFileMetadata(filePath) {
+    return this.importer.readFileMetadata(filePath);
+  }
+
+  /**
+   * Another window is about to rewrite `filePath`. Pause every player
+   * streaming it here — the core truncates and rewrites the WAV, the same
+   * reason the tag queue never writes while this window plays. Synchronous
+   * so main can write as soon as the preload answers.
+   */
+  pauseIfShowing(filePath) {
+    if (!filePath || filePath !== this.state.currentFilePath) return;
+    this.screens.pauseAllPreviews();
+  }
+
+  /**
+   * Another window rewrote `filePath`. Save this window's own edits first
+   * (main merges them field by field), then show the file's current tags
+   * and reload the players so they re-read the rewritten file.
+   */
+  async refreshAfterWriteElsewhere(filePath) {
+    if (!filePath || filePath !== this.state.currentFilePath) return;
     try {
-      this.logger?.setStatus?.('Reading metadata…');
-      const resp = await this.api.inspectFile(filePath);
-      if (resp && resp.ok && resp.metadata) {
-        this._originalBasicInfo = this.wavMetadataService.toBasicInfoFromInspect(filePath, resp);
-        this.analyzeView.setBasicWavInfo(this._originalBasicInfo);
-        this.logger?.setStatus?.('Ready');
-        return;
-      }
-
-      const errMsg = resp && resp.error ? resp.error : 'Unknown error';
-      this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
-      this.logger?.log?.(`Metadata failed: ${errMsg}`);
+      await this._pauseAndFlushTags();
+      await this._readFileMetadata(filePath);
+      this.analyzeView.setAudioPreviewFile(filePath);
+      if (this.state.hasProcessedFile()) this.compareView.setOriginalAudioPreviewFile(filePath);
     } catch (err) {
-      this.logger?.error?.(`Metadata failed: ${err}`);
+      this.logger?.error?.(`Refreshing after another window's edit failed: ${err}`);
     }
-  }
-
-  async processCurrentFile() {
-    if (!this.state.currentFilePath) {
-      this.logger?.setStatus?.('No file to process', true);
-      return;
-    }
-
-    try {
-      this.logger?.setStatus?.('Processing...');
-      this.logger?.log?.('Sending processing request to dissonance-core (simulated)');
-
-      const resp = await this.api.processFile(this.state.currentFilePath);
-      if (resp && resp.ok && resp.processedPath) {
-        this.state.setProcessedFilePath(resp.processedPath);
-
-        this._processedBasicInfo = this.wavMetadataService.toBasicInfoFromProcess(
-          this.state.currentFilePath,
-          resp
-        );
-
-        this.compareView.setOriginalInfo(this._originalBasicInfo);
-        this.compareView.setProcessedInfo(this._processedBasicInfo);
-        this.compareView.setNextEnabled(true);
-        this.exportView.setSelectedFile(resp.processedPath);
-
-        this.logger?.setStatus?.('Processed');
-        this.logger?.log?.(`Processing complete: ${resp.processedPath}`);
-        this._syncButtons();
-
-        this._showCompare();
-        return;
-      }
-
-      const errMsg = resp && resp.error ? resp.error : 'Unknown error';
-      this.logger?.setStatus?.(`Processing failed: ${errMsg}`, true);
-      this.logger?.log?.(`Processing failed: ${errMsg}`);
-    } catch (err) {
-      this.logger?.error?.(`Processing failed: ${err}`);
-    }
-  }
-
-  async exportProcessedFile() {
-    if (!this.state.processedFilePath) {
-      this.logger?.setStatus?.('No processed file to export', true);
-      return;
-    }
-
-    try {
-      this.logger?.setStatus?.('Exporting...');
-      this.logger?.log?.('Triggering export dialog');
-
-      const resp = await this.api.exportFile(this.state.processedFilePath);
-      if (resp && resp.ok && resp.exportedPath) {
-        // After export, the main process cleans up the temp processed file.
-        this.state.setProcessedFilePath(null);
-        this._syncButtons();
-        this.logger?.setStatus?.('Exported');
-        this.logger?.log?.(`Exported to: ${resp.exportedPath}`);
-
-        this._resetToUpload();
-        return;
-      }
-
-      const errMsg = resp && resp.error ? resp.error : 'Unknown error';
-      this.logger?.setStatus?.(`Export failed: ${errMsg}`, true);
-      this.logger?.log?.(`Export failed: ${errMsg}`);
-    } catch (err) {
-      this.logger?.error?.(`Export failed: ${err}`);
-    }
-  }
-
-  _syncButtons() {
-    this.processView.setProcessEnabled(this.state.hasCurrentFile());
-    this.exportView.setExportEnabled(this.state.hasProcessedFile());
-    this.compareView.setNextEnabled(this.state.hasProcessedFile());
-    this.analyzeView.setNextEnabled(this.state.hasCurrentFile());
-  }
-
-  _showAnalyze() {
-    this.router.show('analyze');
-    this._syncButtons();
-  }
-
-  _showProcess() {
-    this.router.show('process');
-    this._syncButtons();
-  }
-
-  _showCompare() {
-    this.router.show('compare');
-    this._syncButtons();
-  }
-
-  _showExport() {
-    this.exportView.setSelectedFile(this.state.processedFilePath);
-    this.router.show('export');
-    this._syncButtons();
   }
 
   _resetToUpload() {
+    this.screens.pauseAllPreviews();
     this.state.setCurrentFilePath(null);
-    this._originalBasicInfo = null;
-    this._processedBasicInfo = null;
-    this.analyzeView.setSelectedFile(null);
-    this.analyzeView.setBasicWavInfo(null);
-    this.processView.setSelectedFile(null);
-    this.compareView.setOriginalInfo(null);
-    this.compareView.setProcessedInfo(null);
-    this.exportView.setSelectedFile(null);
-    this.router.show('upload');
-    this._syncButtons();
-  }
-
-  _onGlobalDragOver(e) {
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-  }
-
-  _onGlobalDrop(e) {
-    e.preventDefault();
-
-    // Allow dropping anywhere in the window (useful after you are on the main view).
-    const dt = e.dataTransfer;
-    if (!dt || !dt.files || dt.files.length === 0) return;
-
-    const file = dt.files[0];
-    const filePath = this.api?.getPathForFile ? this.api.getPathForFile(file) : file.path || null;
-    if (!filePath) return;
-
-    this.importFile(filePath, 'Dropped');
+    this.tags.clearFormFill();
+    this.importer.clear();
+    this.screens.clearFileScreens();
+    this.screens.showUpload();
   }
 }

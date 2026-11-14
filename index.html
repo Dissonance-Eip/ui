@@ -2,170 +2,507 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Dissonance UI (IPC demo)</title>
+    <title>Dissonance</title>
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' file:; media-src 'self' file: data:;"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./tailwind.css" />
+    <link
+      rel="stylesheet"
+      href="./node_modules/@arraypress/waveform-player/dist/waveform-player.css"
+    />
   </head>
-  <body>
-    <header>
-      <h1>Dissonance UI</h1>
-      <p>Import an audio file, then process and export it via simulated dissonance-core.</p>
-    </header>
-    <main>
-      <section id="view-upload" class="view">
-        <div id="welcome">
-          <div id="dropZone">
-            <svg
-              class="dropZoneIcon"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
+  <body
+    class="min-h-screen bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100"
+  >
+    <div class="min-h-screen flex flex-col">
+      <button
+        id="restartBtn"
+        class="fixed top-4 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-slate-700 shadow-sm backdrop-blur hover:bg-white dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-900"
+        type="button"
+        title="Restart"
+        aria-label="Restart"
+      >
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M20 8A8.5 8.5 0 1 0 20.5 15"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M20 3V8H15"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+      <header id="appHeader" class="px-6 py-4 text-center">
+        <h1 class="text-2xl font-semibold tracking-tight">Dissonance</h1>
+        <p class="mt-2 text-sm text-slate-600 max-w-2xl mx-auto dark:text-slate-400">
+          Import an audio file, follow the instructions, and we’ll make sure your audio is safe from
+          unethical AI training
+        </p>
+      </header>
+      <main class="flex-1 flex flex-col gap-3 px-6 pb-6 box-border">
+        <section id="view-upload">
+          <div id="welcome" class="flex-1 flex flex-col items-center justify-center gap-4 py-4">
+            <div
+              id="dropZone"
+              class="w-[min(420px,90vw)] aspect-square border-2 border-dashed border-slate-300 rounded-xl p-5 text-center text-sm text-slate-700 bg-slate-50/40 cursor-pointer flex flex-col items-center justify-center gap-3 dark:border-slate-700 dark:text-slate-300 dark:bg-slate-900/20"
+              role="button"
+              tabindex="0"
             >
-              <path
-                d="M8 10L12 6L16 10"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path d="M12 6V16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-              <path
-                d="M5 18.5C5 17.6716 5.67157 17 6.5 17H17.5C18.3284 17 19 17.6716 19 18.5C19 19.3284 18.3284 20 17.5 20H6.5C5.67157 20 5 19.3284 5 18.5Z"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M8 4.5H6.5C5.67157 4.5 5 5.17157 5 6V7.5"
-                stroke="currentColor"
-                stroke-width="1.4"
-                stroke-linecap="round"
-              />
-              <path
-                d="M16 4.5H17.5C18.3284 4.5 19 5.17157 19 6V7.5"
-                stroke="currentColor"
-                stroke-width="1.4"
-                stroke-linecap="round"
-              />
-            </svg>
-            <div class="dropZoneText">
-              Drop an audio file here or <span class="accent">choose file</span>
+              <svg
+                class="w-20 h-20 text-slate-500 dark:text-slate-400"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 10L12 6L16 10"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M12 6V16"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M5 18.5C5 17.6716 5.67157 17 6.5 17H17.5C18.3284 17 19 17.6716 19 18.5C19 19.3284 18.3284 20 17.5 20H6.5C5.67157 20 5 19.3284 5 18.5Z"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M8 4.5H6.5C5.67157 4.5 5 5.17157 5 6V7.5"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M16 4.5H17.5C18.3284 4.5 19 5.17157 19 6V7.5"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <div class="max-w-sm leading-5">
+                Drop an audio file here or
+                <span class="font-semibold text-blue-800 dark:text-blue-300">choose file</span>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section id="view-analyze" class="view" hidden>
-        <div class="step">
-          <h2 class="stepTitle">Analyze / Prepare</h2>
+        <section id="view-analyze" hidden>
+          <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-3 py-6">
+            <h2 class="m-0 text-center text-base font-semibold text-slate-800 dark:text-slate-100">
+              Analyze
+            </h2>
 
-          <div class="fileRow">
-            <div id="analyzeSelectedFile" class="selectedFile">No file selected</div>
-            <button id="analyzeChangeFileBtn" class="changeFileBtn" type="button">
-              Change file
-            </button>
-          </div>
-
-          <div class="metaPanel" aria-label="WAV basic info">
-            <div class="label">Filename</div>
-            <div id="analyzeMetaFilename" class="value">—</div>
-
-            <div class="label">Duration</div>
-            <div id="analyzeMetaDuration" class="value">—</div>
-
-            <div class="label">Sample rate</div>
-            <div id="analyzeMetaSampleRate" class="value">—</div>
-
-            <div class="label">Channels</div>
-            <div id="analyzeMetaChannels" class="value">—</div>
-          </div>
-
-          <div class="controls">
-            <button id="analyzeNextBtn" class="secondaryBtn" type="button" disabled>
-              Continue
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section id="view-process" class="view" hidden>
-        <div class="step">
-          <h2 class="stepTitle">Process</h2>
-
-          <div class="fileRow">
-            <div id="processSelectedFile" class="selectedFile">No file selected</div>
-          </div>
-
-          <div class="controls">
-            <button id="processBtn" class="primaryBtn processBtn" type="button" disabled>
-              Process
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section id="view-compare" class="view" hidden>
-        <div class="step">
-          <h2 class="stepTitle">Compare</h2>
-
-          <div class="panelGroup">
-            <div class="metaPanel" aria-label="Original WAV info">
-              <div class="label">Original</div>
-              <div id="compareOrigFilename" class="value">—</div>
-
-              <div class="label">Duration</div>
-              <div id="compareOrigDuration" class="value">—</div>
-
-              <div class="label">Sample rate</div>
-              <div id="compareOrigSampleRate" class="value">—</div>
-
-              <div class="label">Channels</div>
-              <div id="compareOrigChannels" class="value">—</div>
+            <!-- FULL WIDTH: file chip -->
+            <div
+              class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40"
+            >
+              <div
+                id="analyzeSelectedFile"
+                class="min-w-0 flex-1 truncate text-sm text-slate-900 dark:text-slate-100"
+              >
+                No file selected
+              </div>
+              <button
+                id="analyzeChangeFileBtn"
+                class="shrink-0 rounded-full border border-slate-300 bg-white/70 px-4 py-1.5 text-sm font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100"
+                type="button"
+              >
+                Change file
+              </button>
             </div>
 
-            <div class="metaPanel" aria-label="Processed WAV info">
-              <div class="label">Processed</div>
-              <div id="compareProcFilename" class="value">—</div>
+            <!-- FULL WIDTH: compact horizontal info row -->
+            <div
+              class="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40"
+              aria-label="WAV basic info"
+            >
+              <div class="flex items-center gap-2">
+                <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >Duration</span
+                >
+                <span id="analyzeMetaDuration" class="text-sm text-slate-900 dark:text-slate-100"
+                  >—</span
+                >
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >Sample rate</span
+                >
+                <span id="analyzeMetaSampleRate" class="text-sm text-slate-900 dark:text-slate-100"
+                  >—</span
+                >
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >Channels</span
+                >
+                <span id="analyzeMetaChannels" class="text-sm text-slate-900 dark:text-slate-100"
+                  >—</span
+                >
+              </div>
+            </div>
 
-              <div class="label">Duration</div>
-              <div id="compareProcDuration" class="value">—</div>
+            <!-- FULL WIDTH: waveform -->
+            <div
+              id="analyzeWaveform"
+              class="min-h-[200px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/40"
+              aria-label="Audio preview"
+            ></div>
 
-              <div class="label">Sample rate</div>
-              <div id="compareProcSampleRate" class="value">—</div>
+            <!-- TWO COLUMNS: metadata | protection + process -->
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+              <section
+                class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/40"
+                aria-label="File metadata"
+              >
+                <h3 class="m-0 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Metadata
+                </h3>
 
-              <div class="label">Channels</div>
-              <div id="compareProcChannels" class="value">—</div>
+                <div class="mt-3 grid grid-cols-1 gap-3 min-[820px]:grid-cols-2">
+                  <label class="block">
+                    <div class="field-label">Title</div>
+                    <input
+                      data-tag="title"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <div class="field-label">Artist</div>
+                    <input
+                      data-tag="artist"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <div class="field-label">Date</div>
+                    <input
+                      data-tag="date"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <div class="field-label">Genre</div>
+                    <input
+                      data-tag="genre"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+
+                  <label class="block min-[820px]:col-span-2">
+                    <div class="field-label">Comment</div>
+                    <input
+                      data-tag="comment"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <div class="field-label">Copyright</div>
+                    <input
+                      data-tag="copyright"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+
+                  <label class="block">
+                    <div class="field-label">Software</div>
+                    <input
+                      data-tag="software"
+                      class="field-input"
+                      type="text"
+                      placeholder="—"
+                      autocomplete="off"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <!-- Right side: processing modes + process button -->
+              <div
+                class="flex flex-col justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-900/40"
+              >
+                <section aria-label="Protection settings">
+                  <h3 class="m-0 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    Protection
+                  </h3>
+                  <div class="mt-3">
+                    <div class="field-label">Processing modes</div>
+                    <details class="mt-2">
+                      <summary
+                        class="flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                      >
+                        <span id="processingModesLabel">Select modes</span>
+                        <svg
+                          class="h-4 w-4 text-slate-500 dark:text-slate-400"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M5 7.5L10 12.5L15 7.5"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </summary>
+                      <div
+                        class="mt-2 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+                      >
+                        <label class="flex items-center gap-2">
+                          <input
+                            class="h-4 w-4 accent-amber-400"
+                            type="checkbox"
+                            data-processing-mode
+                            value="white_noise"
+                            data-label="White Noise"
+                          />
+                          <span>White Noise</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                          <input
+                            class="h-4 w-4 accent-amber-400"
+                            type="checkbox"
+                            data-processing-mode
+                            value="phase_distortion"
+                            data-label="Phase Distortion"
+                          />
+                          <span>Phase Distortion</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                          <input
+                            class="h-4 w-4 accent-amber-400"
+                            type="checkbox"
+                            data-processing-mode
+                            value="spectral_gate"
+                            data-label="Spectral Gate"
+                          />
+                          <span>Spectral Gate</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                          <input
+                            class="h-4 w-4 accent-amber-400"
+                            type="checkbox"
+                            data-processing-mode
+                            value="pink_noise"
+                            data-label="Pink Noise"
+                          />
+                          <span>Pink Noise</span>
+                        </label>
+                      </div>
+                    </details>
+                    <div class="mt-2 text-xs text-slate-500 dark:text-slate-500">
+                      Select at least one mode to enable processing.
+                    </div>
+                  </div>
+                </section>
+
+                <div class="flex items-center justify-center">
+                  <button
+                    id="processBtn"
+                    class="rounded-full bg-amber-300 px-6 py-2.5 text-sm font-medium text-slate-900 disabled:cursor-default disabled:opacity-60"
+                    type="button"
+                    disabled
+                  >
+                    Process
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- /two-column -->
+          </div>
+        </section>
+
+        <section id="view-processing" hidden>
+          <div class="flex-1 flex flex-col items-center justify-center gap-4 py-16">
+            <div
+              class="h-10 w-10 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin dark:border-slate-700"
+            ></div>
+            <div
+              class="w-full max-w-xs h-1.5 rounded-full bg-slate-200 overflow-hidden dark:bg-slate-800"
+            >
+              <div class="h-full w-1/3 rounded-full bg-emerald-500 animate-indeterminate-bar"></div>
+            </div>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Processing your audio…</p>
+          </div>
+        </section>
+
+        <section id="view-compare" hidden>
+          <div class="flex-1 flex flex-col gap-3">
+            <h2 class="m-0 text-center text-base font-semibold text-slate-800 dark:text-slate-100">
+              Compare
+            </h2>
+
+            <div class="grid grid-cols-1 gap-3 min-[820px]:grid-cols-2">
+              <div class="flex flex-col gap-3">
+                <div
+                  class="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/40"
+                  aria-label="Original WAV info"
+                >
+                  <div class="field-label">Original</div>
+                  <div
+                    id="compareOrigFilename"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Duration</div>
+                  <div
+                    id="compareOrigDuration"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Sample rate</div>
+                  <div
+                    id="compareOrigSampleRate"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Channels</div>
+                  <div
+                    id="compareOrigChannels"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+                </div>
+
+                <div
+                  id="compareOrigWaveform"
+                  class="min-h-[200px] rounded-lg border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950"
+                  aria-label="Original audio preview"
+                ></div>
+              </div>
+
+              <div class="flex flex-col gap-3">
+                <div
+                  class="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/40"
+                  aria-label="Processed WAV info"
+                >
+                  <div class="field-label">Processed</div>
+                  <div
+                    id="compareProcFilename"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Duration</div>
+                  <div
+                    id="compareProcDuration"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Sample rate</div>
+                  <div
+                    id="compareProcSampleRate"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Channels</div>
+                  <div
+                    id="compareProcChannels"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Modes</div>
+                  <div
+                    id="compareProcModes"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+
+                  <div class="field-label">Intensity</div>
+                  <div
+                    id="compareProcIntensity"
+                    class="text-sm text-slate-900 truncate dark:text-slate-100"
+                  >
+                    —
+                  </div>
+                </div>
+
+                <div
+                  id="compareProcWaveform"
+                  class="min-h-[200px] rounded-lg border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950"
+                  aria-label="Processed audio preview"
+                ></div>
+              </div>
+            </div>
+
+            <div class="flex justify-center gap-3 items-center flex-wrap pb-2">
+              <button
+                id="compareExportBtn"
+                class="rounded-full px-5 py-2 text-sm font-medium bg-emerald-200 text-slate-900 disabled:opacity-60 disabled:cursor-default"
+                type="button"
+                disabled
+              >
+                Export
+              </button>
             </div>
           </div>
-
-          <div class="controls">
-            <button id="compareNextBtn" class="secondaryBtn" type="button" disabled>
-              Continue
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section id="view-export" class="view" hidden>
-        <div class="step">
-          <h2 class="stepTitle">Export</h2>
-
-          <div class="fileRow">
-            <div id="exportSelectedFile" class="selectedFile">No processed file</div>
-          </div>
-
-          <div class="controls">
-            <button id="exportBtn" class="primaryBtn exportBtn" type="button" disabled>
-              Export
-            </button>
-          </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </div>
+    <script src="./node_modules/@arraypress/waveform-player/dist/waveform-player.min.js"></script>
     <script type="module" src="./renderer/index.js"></script>
   </body>
 </html>

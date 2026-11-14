@@ -1,28 +1,38 @@
 import { BaseApi } from '../base/BaseApi.js';
 
+/**
+ * Typed-ish facade over the preload bridge (`window.dissonance`).
+ * Each method delegates to a bridge function, which in turn maps to an
+ * `ipcRenderer.invoke` (request/response) or `ipcRenderer.on` (subscription)
+ * channel handled by the main process.
+ */
 export class DissonanceApi extends BaseApi {
-  async openFile() {
-    return this._call('openFile');
+  async openFile(lastFilePath) {
+    return this._call('openFile', lastFilePath);
+  }
+
+  async getSystemTheme() {
+    return this._call('getSystemTheme');
   }
 
   getPathForFile(file) {
     return this._call('getPathForFile', file);
   }
 
-  async getFileStats(filePath) {
-    return this._call('getFileStats', filePath);
-  }
-
-  async inspectFile(filePath) {
-    return this._call('inspectFile', filePath);
+  async readFileMetadata(filePath) {
+    return this._call('readFileMetadata', filePath);
   }
 
   async cleanupProcessedFile(processedPath) {
     return this._call('cleanupProcessedFile', processedPath);
   }
 
-  async processFile(filePath) {
-    return this._call('processFile', filePath);
+  async processFile(filePath, options) {
+    return this._call('processFile', filePath, options);
+  }
+
+  async writeTags(filePath, tags) {
+    return this._call('writeTags', filePath, tags);
   }
 
   async exportFile(processedPath) {
@@ -31,5 +41,27 @@ export class DissonanceApi extends BaseApi {
 
   onCoreStatus(cb) {
     return this._call('onCoreStatus', cb);
+  }
+
+  /** Main asks this window to save its tag edits before it closes or quits. */
+  onAppFlushRequest(cb) {
+    return this._call('onAppFlushRequest', cb);
+  }
+
+  onSystemTheme(cb) {
+    return this._call('onSystemTheme', cb);
+  }
+
+  onPauseFileRequest(cb) {
+    return this._call('onPauseFileRequest', cb);
+  }
+
+  onTagsWrittenElsewhere(cb) {
+    return this._call('onTagsWrittenElsewhere', cb);
+  }
+
+  /** True only in an unpacked development build. */
+  isDevelopment() {
+    return this._call('isDevelopment') === true;
   }
 }

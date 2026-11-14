@@ -1,34 +1,28 @@
-import { BaseView } from '../base/BaseView.js';
+/**
+ * Third screen after processing: side-by-side comparison of the original
+ * and the processed WAV. Hosts two independent WaveformPreview instances
+ * + an info panel each (rendered by renderWavInfo) + a single Export button.
+ */
+import { BaseComponent } from '../base/BaseComponent.js';
+import { WaveformPreview } from '../components/WaveformPreview.js';
+import { renderWavInfo } from './renderWavInfo.js';
+import { formatModes, formatIntensity } from '../utils/processingOptions.js';
 
-function formatDuration(durationSec) {
-  if (typeof durationSec === 'number' && Number.isFinite(durationSec) && durationSec >= 0) {
-    const total = Math.round(durationSec);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }
-  return '—';
-}
-
-function formatSampleRate(sampleRate) {
-  return sampleRate ? `${sampleRate} Hz` : '—';
-}
-
-function formatChannels(channels) {
-  return channels ? String(channels) : '—';
-}
-
-export class CompareView extends BaseView {
+export class CompareView extends BaseComponent {
   constructor({
     origFilenameEl,
     origDurationEl,
     origSampleRateEl,
     origChannelsEl,
+    origWaveformEl,
     procFilenameEl,
     procDurationEl,
     procSampleRateEl,
     procChannelsEl,
-    nextBtn,
+    procModesEl,
+    procIntensityEl,
+    procWaveformEl,
+    exportBtn,
   }) {
     super();
     this.origFilenameEl = origFilenameEl;
@@ -40,37 +34,90 @@ export class CompareView extends BaseView {
     this.procDurationEl = procDurationEl;
     this.procSampleRateEl = procSampleRateEl;
     this.procChannelsEl = procChannelsEl;
+    this.procModesEl = procModesEl;
+    this.procIntensityEl = procIntensityEl;
 
-    this.nextBtn = nextBtn;
+    this.exportBtn = exportBtn;
+
+    this._origPreview = new WaveformPreview({ containerEl: origWaveformEl, height: 140 });
+    this._procPreview = new WaveformPreview({ containerEl: procWaveformEl, height: 140 });
   }
 
   mount() {
     super.mount();
+    this._origPreview.mount();
+    this._procPreview.mount();
+    this.track(() => this._origPreview.unmount());
+    this.track(() => this._procPreview.unmount());
   }
 
-  setNextEnabled(enabled) {
-    if (!this.nextBtn) return;
-    this.nextBtn.disabled = !enabled;
+  // ---------------------------------------------------------------------------
+  // Waveform previews
+  // ---------------------------------------------------------------------------
+
+  setAudioPreviewFiles({ originalPath, processedPath }) {
+    this._origPreview.setFile(originalPath);
+    this._procPreview.setFile(processedPath);
   }
 
-  onNext(cb) {
-    if (!this.nextBtn) return;
-    this.listen(this.nextBtn, 'click', cb);
+  setOriginalAudioPreviewFile(filePath) {
+    this._origPreview.setFile(filePath);
   }
+
+  pauseAudioPreviews() {
+    this._origPreview.pause();
+    this._procPreview.pause();
+  }
+
+  clearAudioPreviews() {
+    this._origPreview.clear();
+    this._procPreview.clear();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Info panels
+  // ---------------------------------------------------------------------------
 
   setOriginalInfo(basicInfo) {
-    const { filename, durationSec, sampleRate, channels } = basicInfo || {};
-    if (this.origFilenameEl) this.origFilenameEl.textContent = filename || '—';
-    if (this.origDurationEl) this.origDurationEl.textContent = formatDuration(durationSec);
-    if (this.origSampleRateEl) this.origSampleRateEl.textContent = formatSampleRate(sampleRate);
-    if (this.origChannelsEl) this.origChannelsEl.textContent = formatChannels(channels);
+    renderWavInfo(
+      {
+        filenameEl: this.origFilenameEl,
+        durationEl: this.origDurationEl,
+        sampleRateEl: this.origSampleRateEl,
+        channelsEl: this.origChannelsEl,
+      },
+      basicInfo
+    );
   }
 
   setProcessedInfo(basicInfo) {
-    const { filename, durationSec, sampleRate, channels } = basicInfo || {};
-    if (this.procFilenameEl) this.procFilenameEl.textContent = filename || '—';
-    if (this.procDurationEl) this.procDurationEl.textContent = formatDuration(durationSec);
-    if (this.procSampleRateEl) this.procSampleRateEl.textContent = formatSampleRate(sampleRate);
-    if (this.procChannelsEl) this.procChannelsEl.textContent = formatChannels(channels);
+    renderWavInfo(
+      {
+        filenameEl: this.procFilenameEl,
+        durationEl: this.procDurationEl,
+        sampleRateEl: this.procSampleRateEl,
+        channelsEl: this.procChannelsEl,
+      },
+      basicInfo
+    );
+  }
+
+  /** @param {{modes?: string[], perturbation?: number}|null} options  what the core ran with */
+  setProcessingInfo(options) {
+    const { modes, perturbation } = options || {};
+    if (this.procModesEl) this.procModesEl.textContent = formatModes(modes);
+    if (this.procIntensityEl) this.procIntensityEl.textContent = formatIntensity(perturbation);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Buttons
+  // ---------------------------------------------------------------------------
+
+  setExportEnabled(enabled) {
+    if (this.exportBtn) this.exportBtn.disabled = !enabled;
+  }
+
+  onExport(cb) {
+    if (this.exportBtn) this.listen(this.exportBtn, 'click', cb);
   }
 }

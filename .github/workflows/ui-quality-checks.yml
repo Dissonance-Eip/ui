@@ -22,12 +22,21 @@ concurrency:
 
 jobs:
   quality-checks:
-    name: Lint, Format, Build
+    name: Lint, Format, Test, Build
     runs-on: ubuntu-latest
+    # SonarQube Cloud (docs#78) reuses the coverage report below. The scan is
+    # skipped until the SONAR_TOKEN secret exists. It runs on pull requests and
+    # on pushes to main (the Sonar main branch): the free plan analyses nothing else.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ENABLED: ${{ secrets.SONAR_TOKEN != '' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_name == 'main')) }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Sonar needs history for blame and new-code detection.
+          fetch-depth: ${{ secrets.SONAR_TOKEN != '' && '0' || '1' }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -45,7 +54,7 @@ jobs:
 
       - name: Validate required npm scripts
         run: |
-          node -e "const scripts = (require('./package.json').scripts || {}); const missing = ['lint','format','build'].filter((name) => !scripts[name]); if (missing.length) { console.error('Missing required npm script(s): ' + missing.join(', ')); process.exit(1); }"
+          node -e "const scripts = (require('./package.json').scripts || {}); const missing = ['lint','format','test','build'].filter((name) => !scripts[name]); if (missing.length) { console.error('Missing required npm script(s): ' + missing.join(', ')); process.exit(1); }"
 
       - name: Run lint
         run: npm run lint
@@ -57,6 +66,21 @@ jobs:
           else
             npm run format -- --check
           fi
+
+      - name: Run unit and addon integration tests
+        run: npm test
+
+      - name: Check test coverage (fails below 85% lines)
+        run: |
+          npm run test:coverage
+          LINES=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct)")
+          echo "### Test coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Total line coverage: **${LINES}%** (team target: 85%, enforced by vitest.config.mjs)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SonarQube Cloud scan
+        if: ${{ env.SONAR_ENABLED == 'true' }}
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
 
       - name: Run build check
         run: npm run build
