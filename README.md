@@ -97,7 +97,7 @@ For an interactive test loop: `npm run test:watch`.
 npm run test:coverage
 ```
 
-Prints a per-file coverage table and writes a report to `coverage/` (git-ignored; open `coverage/index.html` for the browsable version). Every source file is counted, including files that no test imports, so the total reflects the real state of the project. The team target is 50% line coverage; it is not enforced yet. CI prints the total line coverage in the job summary.
+Prints a per-file coverage table and writes a report to `coverage/` (git-ignored; open `coverage/index.html` for the browsable version). Every source file is counted, including files that no test imports, so the total reflects the real state of the project. The team target is 85% line coverage, enforced by `vitest.config.mjs`: the command fails below it, and so does CI, which also prints the total in the job summary.
 
 ### Addon integration test
 
@@ -191,7 +191,7 @@ The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts fro
 
 `npm run dist` builds the installers for your platform (`.dmg` and `.zip` on macOS, an NSIS `.exe` on Windows, an `.AppImage` on Linux) into `dist/`.
 
-Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag builds all three platforms and publishes them as a GitHub release.
+Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag builds all three platforms and publishes them as a GitHub release. A release candidate tag (`vX.Y.Z-rc.N`) is published as a pre-release.
 
 ---
 
