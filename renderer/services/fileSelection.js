@@ -1,9 +1,19 @@
 /**
  * The two ways a user picks a source file — the native open dialog and a
  * drag-and-drop — shared by the upload DropZone and the controller's
- * "change file" / drop-anywhere handlers. Every import goes through one of
- * these, so a file-type check belongs here (see ui#82).
+ * "change file" / drop-anywhere handlers, plus the file-type check that
+ * FileImportFlow.importFile applies to every import (ui#82).
  */
+
+/**
+ * The core only reads WAV. Decided by extension: a non-WAV renamed to .wav
+ * still reaches the core, which refuses it.
+ * @param {string|null|undefined} filePath
+ * @returns {boolean}
+ */
+export function isWavPath(filePath) {
+  return typeof filePath === 'string' && /\.wav$/i.test(filePath);
+}
 
 /**
  * Show the native open dialog and report progress through `logger`.

@@ -86,6 +86,7 @@ export function bootstrap() {
 
   const uploadView = new UploadView({
     dropZoneEl: document.getElementById('dropZone'),
+    errorEl: document.getElementById('uploadError'),
     api,
     logger,
     getLastFilePath: () => state.lastImportedFilePath,
@@ -102,6 +103,7 @@ export function bootstrap() {
     processingModeEls: document.querySelectorAll('[data-processing-mode]'),
     processingModeLabelEl: document.getElementById('processingModesLabel'),
     processBtn: document.getElementById('processBtn'),
+    errorEl: document.getElementById('analyzeError'),
   });
 
   const compareView = new CompareView({

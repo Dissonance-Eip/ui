@@ -1,8 +1,9 @@
 /**
  * Getting a source file onto the Analyze screen:
  *
- *   • importFile → flush the old file's tag edits → show the new file →
- *     read its metadata into the tag form
+ *   • importFile → refuse a non-WAV (message, nothing else changes) →
+ *     flush the old file's tag edits → show the new file → read its
+ *     metadata into the tag form
  *   • changeFile → open dialog → importFile
  *   • a drop anywhere in the window → importFile (and never let Electron
  *     navigate to the dropped file)
@@ -11,13 +12,15 @@
  * file is shown now, so a late reply can't fill the form with the wrong
  * file's tags (#111).
  */
-import { promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
+import { isWavPath, promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
+import { basename } from '../utils/pathUtils.js';
+import { userErrorReason } from '../utils/errorMessage.js';
 
 export class FileImportFlow {
   /**
    * @param {{ api: object, logger?: object, state: object, analyzeView: object,
    *   compareView: object, wavMetadataService: object, tags: object,
-   *   screens: object, discardProcessedFile: () => void }} deps
+   *   uploadView: object, screens: object, discardProcessedFile: () => void }} deps
    *   tags — the TagEditSession; screens — the ScreenNavigator;
    *   discardProcessedFile — drops the previous processed temp file.
    */
@@ -31,6 +34,7 @@ export class FileImportFlow {
     this.tags = deps.tags;
     this.screens = deps.screens;
     this.discardProcessedFile = deps.discardProcessedFile;
+    this.uploadView = deps.uploadView;
 
     // Basic info of the shown source file; Compare shows it next to the output.
     this.originalInfo = null;
@@ -45,6 +49,12 @@ export class FileImportFlow {
    * @param {string} sourceLabel    'Dropped' or 'Selected' — for logging only
    */
   async importFile(filePath, sourceLabel) {
+    if (!isWavPath(filePath)) {
+      this._refuseFile(filePath);
+      return;
+    }
+    this.uploadView.clearError();
+
     // Capture any tag edits for the OLD file and flush them safely before we
     // touch anything. Also waits for in-flight writes so the read below
     // sees fresh values (matters when reimporting the same file).
@@ -60,6 +70,17 @@ export class FileImportFlow {
 
     // Read WAV metadata immediately so the user can view and edit fields before processing.
     this.readFileMetadata(filePath);
+  }
+
+  /**
+   * Say why `filePath` was not imported: on Analyze when a file is shown
+   * (it stays), on Upload otherwise.
+   */
+  _refuseFile(filePath) {
+    const message = `Only WAV files are supported. "${basename(filePath)}" was not imported.`;
+    this.logger?.setStatus?.(message, true);
+    const view = this.state.currentFilePath ? this.analyzeView : this.uploadView;
+    view.showError(message);
   }
 
   /** Show `filePath` with placeholder info until its metadata arrives. */
@@ -91,10 +112,16 @@ export class FileImportFlow {
       }
       const errMsg = resp && resp.error ? resp.error : 'Unknown error';
       this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
+      this._showReadError(errMsg);
     } catch (err) {
       if (!this._isCurrentRead(readId, filePath)) return;
       this.logger?.error?.(`Metadata failed: ${err}`);
+      this._showReadError(err);
     }
+  }
+
+  _showReadError(error) {
+    this.analyzeView.showError(`Could not read this file: ${userErrorReason(error)}`);
   }
 
   _showReadMetadata(filePath, resp) {
@@ -118,9 +145,10 @@ export class FileImportFlow {
     if (filePath) this.importFile(filePath, 'Selected');
   }
 
-  /** Forget the shown file's info (back to Upload). */
+  /** Forget the shown file's info and any refusal message (back to Upload). */
   clear() {
     this.originalInfo = null;
+    this.uploadView.clearError();
   }
 
   /** Window-level dragover: allow the drop and show the copy cursor. */

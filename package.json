@@ -42,10 +42,16 @@
       "buildResources": "resources"
     },
     "mac": {
-      "icon": "resources/icon.png",
+      "icon": "resources/icon-mac.icns",
       "target": [
         "dmg",
         "zip"
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "asarUnpack": [
+        "Build/Release/*-darwin-*.node"
       ]
     },
     "win": {

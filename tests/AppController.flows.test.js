@@ -175,6 +175,21 @@ describe('AppController — import flow', () => {
     expect(app.logger.setStatus).toHaveBeenLastCalledWith('Metadata failed: unreadable', true);
   });
 
+  it('shows a failed metadata read on Analyze', async () => {
+    const app = startApp();
+    app.bridge.readFileMetadata.mockResolvedValueOnce({
+      ok: false,
+      error: 'Error: Failed to read WAV',
+    });
+
+    await app.controller.importFile(SONG, 'Dropped');
+    await settle();
+
+    expect(app.analyzeView.showError).toHaveBeenLastCalledWith(
+      'Could not read this file: Failed to read WAV'
+    );
+  });
+
   it('logs a metadata read that throws', async () => {
     const app = startApp();
     app.bridge.readFileMetadata.mockRejectedValueOnce(new Error('ipc down'));
@@ -318,14 +333,13 @@ describe('AppController — process flow', () => {
     expect(app.bridge.processFile).not.toHaveBeenCalled();
   });
 
-  it('needs at least one processing mode', async () => {
+  it('asks the core for a pass-through (strength 0) when no mode is selected', async () => {
     const app = startApp({ modes: [] });
     await importSong(app);
 
     await app.controller.processCurrentFile();
 
-    expect(app.logger.setStatus).toHaveBeenLastCalledWith('Select at least one processing mode');
-    expect(app.bridge.processFile).not.toHaveBeenCalled();
+    expect(app.bridge.processFile).toHaveBeenCalledWith(SONG, { modes: [], perturbation: 0 });
   });
 
   it('shows Processing, then tags the output and reveals Compare', async () => {
@@ -367,6 +381,28 @@ describe('AppController — process flow', () => {
     expect(lastScreen(app.router)).toBe('analyze');
     expect(app.logger.setStatus).toHaveBeenLastCalledWith('Processing failed: bad wav', true);
     expect(app.state.processedFilePath).toBeNull();
+  });
+
+  it('shows the failure on Analyze and lets the user retry (F30: truncated WAV)', async () => {
+    const app = startApp();
+    await importSong(app);
+    app.bridge.processFile.mockResolvedValueOnce({
+      ok: false,
+      error: 'Error: Failed to read audio data',
+    });
+
+    await app.controller.processCurrentFile();
+
+    expect(lastScreen(app.router)).toBe('analyze');
+    expect(app.analyzeView.showError).toHaveBeenLastCalledWith(
+      'Could not process this file: Failed to read audio data'
+    );
+    expect(app.analyzeView.setProcessEnabled).toHaveBeenLastCalledWith(true);
+
+    await app.controller.processCurrentFile();
+
+    expect(lastScreen(app.router)).toBe('compare');
+    expect(app.analyzeView.clearError).toHaveBeenCalled();
   });
 
   it('goes back to Analyze when the core call throws', async () => {

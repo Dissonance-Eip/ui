@@ -35,5 +35,78 @@ full checks on every push.
 In an emergency you can skip the hook with `git commit --no-verify`. CI will
 still reject lint or format errors, so fix them in a follow-up commit.
 
+## Signing and notarizing macOS releases
+
+Release tags (`v*`) build a macOS app that is signed with Luca's Developer ID
+Application certificate and notarized by Apple, in CI only. Either maintainer
+can cut a signed release by pushing a tag; nobody needs the certificate or an
+Apple ID on their own machine. A tag build fails if a signing secret is
+missing. A manual run of the workflow without the secrets builds an ad-hoc
+signed app instead.
+
+Local `npm run build` and `npm run dist` need no secret. They sign with a
+Developer ID identity if your keychain has one, and fall back to an ad-hoc
+signature otherwise. Notarization only runs when the `APPLE_API_*` variables
+are set. To force an ad-hoc build on a machine that has an identity, run
+`npx electron-builder --dir -c.mac.identity=-`.
+
+### One-time setup (certificate owner)
+
+1. **Export the certificate.** In Keychain Access, under **login → My
+   Certificates**, expand "Developer ID Application: Luca Martinet
+   (K27C2H5753)". Select both the certificate and its private key,
+   right-click, choose **Export 2 items…**, save as `cert.p12` and set a strong
+   password. Then copy it as base64:
+
+   ```bash
+   base64 -i cert.p12 | pbcopy
+   ```
+
+2. **Create an App Store Connect API key.** In
+   [App Store Connect](https://appstoreconnect.apple.com/access/integrations/api),
+   open **Users and Access → Integrations → Team Keys**, click **+**, name the
+   key (for example "Dissonance CI") and give it the **Developer** role.
+   Download the `.p8` file: Apple lets you download it only once. Note the
+   **Key ID** shown in the key's row and the **Issuer ID** shown above the
+   table.
+
+3. **Add the five secrets** in ui → **Settings → Secrets and variables →
+   Actions → New repository secret**:
+
+   | Secret             | Value                                                       |
+   | ------------------ | ----------------------------------------------------------- |
+   | `CSC_LINK`         | the base64 text copied in step 1                            |
+   | `CSC_KEY_PASSWORD` | the `.p12` password from step 1                             |
+   | `APPLE_API_KEY`    | the full contents of the `.p8` file, `BEGIN`/`END` included |
+   | `APPLE_API_KEY_ID` | the Key ID                                                  |
+   | `APPLE_API_ISSUER` | the Issuer ID                                               |
+
+   Then delete `cert.p12` and the `.p8` file from your disk (or move them to a
+   password manager) and clear the clipboard.
+
+4. **Check a signed build** by pushing a release candidate tag:
+
+   ```bash
+   git tag v0.1.2-rc.1 && git push origin v0.1.2-rc.1
+   ```
+
+   In the **Release App** run, the macOS job's "Verify macOS signature and
+   notarization" step must pass. After downloading the `.dmg` from the
+   pre-release, opening the app must not show a Gatekeeper warning, and
+   `spctl -a -vvv -t exec /Applications/Dissonance.app` must report
+   `source=Notarized Developer ID`.
+
+### Rotation and expiry
+
+- **API key:** it does not expire, but it can be revoked. To rotate it, create
+  a new key, update `APPLE_API_KEY`, `APPLE_API_KEY_ID` and
+  `APPLE_API_ISSUER`, then revoke the old key. Revoke it at once if it leaks.
+- **Certificate:** a Developer ID Application certificate is valid for about
+  five years (see its expiry date in Keychain Access). Before it expires,
+  create a new one in the Apple Developer portal, export it again as in step 1
+  and update `CSC_LINK` and `CSC_KEY_PASSWORD`. Releases already signed and
+  notarized keep working after the certificate expires, because they carry a
+  secure timestamp.
+
 Found a security problem? Do not open a public issue; follow the
 [security policy](https://github.com/Dissonance-Eip/docs/blob/main/.github/SECURITY.md).

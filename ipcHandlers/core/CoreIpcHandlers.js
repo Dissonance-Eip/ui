@@ -19,8 +19,10 @@
  * `code: ENGINE_UNAVAILABLE` and the loader's `reason`, so the UI can say so.
  */
 const electron = require('electron');
+const { createReadStream, createWriteStream } = require('fs');
 const fs = require('fs').promises;
 const path = require('path');
+const { pipeline } = require('stream/promises');
 const { senderOf, sendToRenderer } = require('../rendererMessaging');
 const { IpcChannels } = require('../ipcChannels');
 const { logger: mainLogger } = require('../../main/logger');
@@ -39,6 +41,19 @@ const ENGINE_UNAVAILABLE = 'ENGINE_UNAVAILABLE';
 /** `core:cleanupProcessed` takes a bare path or `{ processedPath }`. */
 function processedPathOf(payload) {
   return typeof payload === 'string' ? payload : (payload && payload.processedPath) || null;
+}
+
+/**
+ * Strength 0 means "change nothing" (F27). The bundled core builds still run
+ * their FFT/masking stages at 0, so the input is copied here instead. Streamed
+ * into a new file rather than fs.copyFile, which would carry over a read-only
+ * mode and break the tag write that follows.
+ */
+const isPassThrough = (options) => options?.perturbation === 0;
+
+async function copyUnchanged(inputPath, outputPath) {
+  await pipeline(createReadStream(inputPath), createWriteStream(outputPath));
+  return { processedPath: outputPath };
 }
 
 /** The first failed check's `{ ok: false, error }` reply, or null when all pass. */
@@ -135,7 +150,9 @@ class CoreIpcHandlers {
     try {
       // Under the file lock so another window can't rewrite the input's tags mid-read.
       const result = await this.fileLock.runExclusive(filePath, () =>
-        this.coreAddon.process(filePath, addonOptions)
+        isPassThrough(userOptions)
+          ? copyUnchanged(filePath, outputPath)
+          : this.coreAddon.process(filePath, addonOptions)
       );
       const processedPath = result?.processedPath ?? outputPath;
       this.tempFileManager.registerForSender(senderId, processedPath);
@@ -199,7 +216,7 @@ class CoreIpcHandlers {
       const { canceled, filePath } = await this.dialog.showSaveDialog({
         title: 'Export processed file',
         defaultPath: this.exportNames.get(processedPath) ?? path.basename(processedPath),
-        filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
+        filters: [{ name: 'WAV audio', extensions: ['wav'] }],
       });
       if (canceled || !filePath) return { ok: false, error: 'Export canceled' };
 

@@ -14,7 +14,7 @@ import { settle } from './helpers/fakeRenderer.js';
 
 const UI_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const INDEX_PATH = path.join(UI_ROOT, 'index.html');
-const ICON_PATH = path.join(UI_ROOT, 'resources', 'icon.png');
+const DOCK_ICON_PATH = path.join(UI_ROOT, 'resources', 'icon-mac.png');
 
 /** A window class whose renderers answer every flush request at once. */
 function makeFlushingWindowClass(ipc) {
@@ -135,7 +135,7 @@ describe('MainApplication — Dock icon', () => {
 
     await runApplication({ app: makeApp({ dock }), platform: 'darwin' });
 
-    expect(dock.setIcon).toHaveBeenCalledWith(ICON_PATH);
+    expect(dock.setIcon).toHaveBeenCalledWith(DOCK_ICON_PATH);
   });
 
   it('leaves the Dock alone on other platforms', async () => {

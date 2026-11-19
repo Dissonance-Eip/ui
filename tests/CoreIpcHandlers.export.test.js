@@ -105,6 +105,17 @@ describe('core:export source', () => {
     );
   });
 
+  it('offers only WAV in the save dialog, the format the core writes', async () => {
+    const { dialog, tempFileManager, sender, exportFile } = setup();
+    const processedPath = await makeTrackedTempFile(tempFileManager, sender.id);
+
+    await exportFile(processedPath);
+
+    expect(dialog.showSaveDialog.mock.calls[0][0].filters).toEqual([
+      { name: 'WAV audio', extensions: ['wav'] },
+    ]);
+  });
+
   it('still reports success when the temp file cannot be deleted afterwards', async () => {
     const { tempFileManager, sender, exportFile, savePath } = setup();
     const processedPath = await makeTrackedTempFile(tempFileManager, sender.id);

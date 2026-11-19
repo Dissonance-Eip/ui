@@ -18,10 +18,12 @@
  * Regression coverage (Beta 1 defects):
  *   - F9:  a non-WAV file is rejected with a clear error.
  *   - F10: a truncated WAV is rejected with a clear error.
- *   - F27: a strength of 0 must leave the audio untouched. The current addon
- *     does not satisfy this yet (see ui#83), so those tests use `it.fails`.
- *     When the addon is fixed they will start failing as "unexpectedly
- *     passing": remove `.fails` at that point.
+ *   - F27: a strength of 0 must leave the audio untouched. These cases call
+ *     the bundled addon directly; it predates the core pass-through fix
+ *     (core#101), so they use `it.fails`. The app itself no longer relies on
+ *     it: the main process copies the input at strength 0 (ui#83). Once a core
+ *     release with that fix is synced into Build/Release/, they will fail as
+ *     "unexpectedly passing": remove `.fails` at that point.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
@@ -269,13 +271,13 @@ describe.skipIf(!binaryExpected)('core addon integration (real addon)', () => {
     });
   });
 
-  describe('F27: 0% strength must not modify the audio (known failure, ui#83)', () => {
-    // Option sets the UI can send at 0%: explicit zero strength, and the empty
-    // options object the app sends when the slider is at 0.
+  describe('F27: 0% strength must not modify the audio (bundled addon, before core#101)', () => {
+    // Zero-strength option sets, including the empty options object older
+    // app builds sent.
     const zeroStrengthCases = [
       ['perturbation 0 with a mode selected', { modes: ['white_noise'], perturbation: 0 }],
       ['perturbation 0 with no modes', { perturbation: 0 }],
-      ['empty options (what the app sends at 0%)', {}],
+      ['empty options', {}],
     ];
 
     it.fails.each(zeroStrengthCases)(

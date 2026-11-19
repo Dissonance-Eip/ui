@@ -90,12 +90,59 @@ describe('ProcessingFlow.process', () => {
     expect(screens.showAnalyze).toHaveBeenCalled();
   });
 
-  it('does not run the core without a mode', async () => {
+  it('shows the core’s reason on Analyze when processing fails', async () => {
+    const { flow, api, analyzeView, screens } = makeFlow();
+    api.processFile.mockResolvedValueOnce({ ok: false, error: 'Error: Failed to read audio data' });
+
+    await flow.process();
+
+    expect(screens.showAnalyze).toHaveBeenCalled();
+    expect(analyzeView.showError).toHaveBeenCalledWith(
+      'Could not process this file: Failed to read audio data'
+    );
+  });
+
+  it('shows a readable error on Analyze when the core call throws', async () => {
+    const { flow, api, analyzeView, screens } = makeFlow();
+    api.processFile.mockRejectedValueOnce(new Error('ipc down'));
+
+    await flow.process();
+
+    expect(screens.showAnalyze).toHaveBeenCalled();
+    expect(analyzeView.showError).toHaveBeenCalledWith('Could not process this file: ipc down');
+  });
+
+  it('clears the previous error when a new run starts', async () => {
+    const { flow, analyzeView, api } = makeFlow();
+
+    await flow.process();
+
+    expect(analyzeView.clearError.mock.invocationCallOrder[0]).toBeLessThan(
+      api.processFile.mock.invocationCallOrder[0]
+    );
+    expect(analyzeView.showError).not.toHaveBeenCalled();
+  });
+
+  it('shows no error for a failure that arrives after a restart', async () => {
+    const { flow, api, analyzeView } = makeFlow();
+    const reply = deferred();
+    api.processFile.mockReturnValueOnce(reply.promise);
+
+    const run = flow.process();
+    await settle();
+    await flow.restart();
+    reply.reject(new Error('late'));
+    await run;
+
+    expect(analyzeView.showError).not.toHaveBeenCalled();
+  });
+
+  it('asks for an explicit pass-through (strength 0) without a mode', async () => {
     const { flow, api } = makeFlow({ modes: [] });
 
     await flow.process();
 
-    expect(api.processFile).not.toHaveBeenCalled();
+    expect(api.processFile).toHaveBeenCalledWith(SONG, { modes: [], perturbation: 0 });
   });
 
   it('a restart invalidates the in-flight run', async () => {
