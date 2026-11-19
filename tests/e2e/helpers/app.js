@@ -14,16 +14,19 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildWav } from './wav.js';
 
-const APP_ROOT = path.resolve(__dirname, '..', '..', '..');
+export const APP_ROOT = path.resolve(__dirname, '..', '..', '..');
 
-/** Launches the app with an isolated userData dir and temp dir under `workDir`. */
-export async function launchApp(workDir) {
+/**
+ * Launches the app from `appRoot` with an isolated userData dir and temp dir
+ * under `workDir`.
+ */
+export async function launchApp(workDir, appRoot = APP_ROOT) {
   const userData = path.join(workDir, 'userData');
   const tmp = path.join(workDir, 'tmp');
   fs.mkdirSync(tmp, { recursive: true });
   const app = await electron.launch({
-    args: [APP_ROOT, `--user-data-dir=${userData}`],
-    cwd: APP_ROOT,
+    args: [appRoot, `--user-data-dir=${userData}`],
+    cwd: appRoot,
     env: { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp },
   });
   const page = await app.firstWindow();

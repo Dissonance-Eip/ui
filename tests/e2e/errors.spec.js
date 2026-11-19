@@ -3,9 +3,8 @@
  * crashes, never reaches Compare with a broken file, and stays usable — a
  * good file imports and processes afterwards.
  *
- * Each failure also shows a readable message (ui#81, ui#82).
+ * Each refusal shows a readable message (ui#82, ui#147).
  */
-import fs from 'node:fs';
 import {
   test,
   expect,
@@ -15,7 +14,6 @@ import {
   waitForMetadata,
   stubOpenDialog,
   openDialogCalls,
-  tickModes,
   processWith,
 } from './helpers/app.js';
 import { buildWav } from './helpers/wav.js';
@@ -47,57 +45,40 @@ async function expectStillUsable(app, page, workDir) {
   await processWith(page, ['White Noise']);
 }
 
-/** Pick `name`, tick a mode and press Process; resolves once the run ended. */
-async function importAndProcess(app, page, workDir, name, bytes) {
-  const file = writeFixture(workDir, name, bytes);
-  await importViaPicker(app, page, file);
-  await tickModes(page, ['White Noise']);
-  await page.locator('#processBtn').click();
-  return file;
-}
+const damagedMessage = (name) => `"${name}" looks incomplete or damaged and was not imported.`;
 
 for (const [name, bytes] of Object.entries(BAD_FILES)) {
-  test(`${name}: Process fails back to Analyze and the app stays usable (F10, F30)`, async ({
-    launched,
+  test(`${name}: refused at import with a message, and the app stays usable (F10, F30)`, async ({
+    app,
+    page,
     workDir,
   }) => {
-    const { app, page, tempRoot } = launched;
-    await importAndProcess(app, page, workDir, name, bytes);
+    await stubOpenDialog(app, writeFixture(workDir, name, bytes));
+    await page.locator('#dropZone').click();
+    await expect.poll(() => openDialogCalls(app)).toBe(1);
 
-    // The failed run lands back on Analyze, never on Compare.
-    await expect(page.locator(screens.analyze)).toBeVisible();
-    await expect(page.locator('#processBtn')).toBeEnabled();
+    // Refused before Analyze, so it can never reach Process.
+    await expect(page.locator('#uploadError')).toHaveText(damagedMessage(name));
+    await expect(page.locator(screens.analyze)).toBeHidden();
     await expect(page.locator(screens.compare)).toBeHidden();
-    // No broken output left behind.
-    expect(fs.existsSync(tempRoot) ? fs.readdirSync(tempRoot) : []).toHaveLength(0);
 
     await expectStillUsable(app, page, workDir);
   });
 
-  test(`${name}: Process shows a readable error on Analyze (#81)`, async ({
+  test(`${name}: refused from Analyze, the current file stays (F10, F30)`, async ({
     app,
     page,
     workDir,
   }) => {
-    await importAndProcess(app, page, workDir, name, bytes);
+    await importViaPicker(app, page, writeFixture(workDir, 'current.wav', GOOD_WAV));
+    await waitForMetadata(page);
 
-    const alert = page.locator('#view-analyze [role="alert"]');
-    await expect(alert).toBeVisible({ timeout: 10_000 });
-    await expect(alert).toContainText(/could not/i);
-  });
-}
+    await stubOpenDialog(app, writeFixture(workDir, name, bytes));
+    await page.locator('#analyzeChangeFileBtn').click();
 
-for (const name of ['zero-length.wav', 'not-riff.wav']) {
-  // A file whose header can't be read says so on import.
-  test(`${name}: import shows a readable error on Analyze (#81)`, async ({
-    app,
-    page,
-    workDir,
-  }) => {
-    await importViaPicker(app, page, writeFixture(workDir, name, BAD_FILES[name]));
-
-    await expect(page.locator('#analyzeMetaSampleRate')).toHaveText('—');
-    await expect(page.locator('#view-analyze [role="alert"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#view-analyze [role="alert"]')).toHaveText(damagedMessage(name));
+    await expect(page.locator('#analyzeSelectedFile')).toHaveText('current.wav');
+    await processWith(page, ['White Noise']);
   });
 }
 
@@ -113,7 +94,7 @@ for (const [name, bytes] of Object.entries(NON_WAV_FILES)) {
     await expect.poll(() => openDialogCalls(app)).toBe(1);
 
     // The picker only offers WAV; the stub stands in for a user forcing another file.
-    await expect(page.locator('#view-upload [role="alert"]')).toBeVisible();
+    await expect(page.locator('#uploadError')).toBeVisible();
     await expect(page.locator(screens.analyze)).toBeHidden();
     await expect(page.locator(screens.compare)).toBeHidden();
 
@@ -126,7 +107,7 @@ for (const [name, bytes] of Object.entries(NON_WAV_FILES)) {
     await page.locator('#dropZone').click();
     await expect.poll(() => openDialogCalls(app)).toBe(1);
 
-    const alert = page.locator('#view-upload [role="alert"]');
+    const alert = page.locator('#uploadError');
     await expect(alert).toBeVisible({ timeout: 10_000 });
     await expect(alert).toContainText(name);
     await expect(page.locator(screens.upload)).toBeVisible();

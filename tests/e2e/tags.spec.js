@@ -17,6 +17,15 @@ import { parseWav } from './helpers/wav.js';
 
 const readWav = (filePath) => parseWav(fs.readFileSync(filePath));
 
+/** The title tag, or null while a save is still rewriting the file (poll stops on a throw). */
+function readTitleWhenComplete(filePath) {
+  try {
+    return readWav(filePath).tags.title;
+  } catch {
+    return null;
+  }
+}
+
 test('a tag edit is written to the file and survives a re-import (F18, F20, F22)', async ({
   app,
   page,
@@ -32,7 +41,7 @@ test('a tag edit is written to the file and survives a re-import (F18, F20, F22)
   await page.locator('[data-tag="genre"]').fill('Ambient');
   // Blur saves: click outside the field.
   await page.locator('#analyzeSelectedFile').click();
-  await expect.poll(() => readWav(file).tags.title).toBe('New title');
+  await expect.poll(() => readTitleWhenComplete(file)).toBe('New title');
 
   // Change file, then come back to the first one.
   await stubOpenDialog(app, other);
