@@ -53,6 +53,8 @@ class MainApplication {
     this.deps = { registerFileHandlers, registerWindowHandlers, cleanupAllTempFiles };
     this.uiRoot = uiRoot;
     this.iconPath = path.join(this.uiRoot, 'resources', 'icon.png');
+    // macOS wants the artwork padded inside a rounded square, unlike Windows/Linux.
+    this.dockIconPath = path.join(this.uiRoot, 'resources', 'icon-mac.png');
     this.indexPath = path.join(this.uiRoot, 'index.html');
     this.windowManager = new MainWindowManager({
       preloadPath: path.join(this.uiRoot, 'preload.js'),
@@ -126,14 +128,14 @@ class MainApplication {
    * Dev-mode (unpacked) Dock icon on macOS — BrowserWindow's `icon` option
    * is a Windows/Linux thing and is ignored for the app icon on macOS, so
    * this is the only way to override it there before packaging exists.
-   * A no-op until resources/icon.png is actually added.
+   * Uses the same padded, rounded artwork as the packaged .icns.
    */
   _applyDockIcon() {
     const { app } = this;
     if (this.platform !== 'darwin' || !app.dock) return;
-    if (!fs.existsSync(this.iconPath)) return;
+    if (!fs.existsSync(this.dockIconPath)) return;
     try {
-      app.dock.setIcon(this.iconPath);
+      app.dock.setIcon(this.dockIconPath);
     } catch (e) {
       logger.warn('Could not set the Dock icon', e);
     }
