@@ -333,14 +333,13 @@ describe('AppController — process flow', () => {
     expect(app.bridge.processFile).not.toHaveBeenCalled();
   });
 
-  it('needs at least one processing mode', async () => {
+  it('asks the core for a pass-through (strength 0) when no mode is selected', async () => {
     const app = startApp({ modes: [] });
     await importSong(app);
 
     await app.controller.processCurrentFile();
 
-    expect(app.logger.setStatus).toHaveBeenLastCalledWith('Select at least one processing mode');
-    expect(app.bridge.processFile).not.toHaveBeenCalled();
+    expect(app.bridge.processFile).toHaveBeenCalledWith(SONG, { modes: [], perturbation: 0 });
   });
 
   it('shows Processing, then tags the output and reveals Compare', async () => {

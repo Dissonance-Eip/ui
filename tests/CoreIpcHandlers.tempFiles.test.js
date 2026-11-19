@@ -41,8 +41,9 @@ function makeWritingAddon() {
 function setup() {
   const ipc = makeHandlingIpc();
   const tempFileManager = new TempFileManager({ rootDir });
+  const coreAddon = makeWritingAddon();
   new CoreIpcHandlers({
-    coreAddon: makeWritingAddon(),
+    coreAddon,
     tempFileManager,
     fileLock: new FileLock(),
     tagWriteCoordinator: {},
@@ -50,7 +51,7 @@ function setup() {
     dialog: {},
   }).register();
   const invokeFrom = (sender, channel, payload) => ipc.handlers.get(channel)({ sender }, payload);
-  return { tempFileManager, invokeFrom };
+  return { tempFileManager, invokeFrom, coreAddon };
 }
 
 async function exists(filePath) {
@@ -96,6 +97,55 @@ describe('core:process — one processed file per window', () => {
     await invokeFrom(windowB, 'core:process', { filePath: SONG });
 
     expect(await exists(fromA.processedPath)).toBe(true);
+  });
+});
+
+describe('core:process — strength 0 is a pass-through (F27)', () => {
+  const ORIGINAL = Buffer.from('RIFF original audio bytes \u0000\u0001\u00ff');
+
+  async function readOnlyInput() {
+    const input = path.join(workDir, 'song.wav');
+    await fs.writeFile(input, ORIGINAL);
+    await fs.chmod(input, 0o444);
+    return input;
+  }
+
+  it.each([
+    ['no mode', { modes: [], perturbation: 0 }],
+    ['a mode', { modes: ['white_noise'], perturbation: 0 }],
+  ])('copies the input byte for byte without the core, with %s', async (_label, options) => {
+    const { invokeFrom, coreAddon, tempFileManager } = setup();
+    const input = await readOnlyInput();
+
+    const reply = await invokeFrom(makeWebContents(), 'core:process', { filePath: input, options });
+
+    expect(reply.ok).toBe(true);
+    expect(coreAddon.process).not.toHaveBeenCalled();
+    expect((await fs.readFile(reply.processedPath)).equals(ORIGINAL)).toBe(true);
+    expect(tempFileManager.isTracked(reply.processedPath)).toBe(true);
+  });
+
+  it('leaves the copy writable when the input is read-only, so tags can be written', async () => {
+    const { invokeFrom } = setup();
+    const input = await readOnlyInput();
+
+    const { processedPath } = await invokeFrom(makeWebContents(), 'core:process', {
+      filePath: input,
+      options: { modes: [], perturbation: 0 },
+    });
+
+    await expect(fs.access(processedPath, fs.constants.W_OK)).resolves.toBeUndefined();
+  });
+
+  it('still runs the core for a non-zero strength', async () => {
+    const { invokeFrom, coreAddon } = setup();
+
+    await invokeFrom(makeWebContents(), 'core:process', {
+      filePath: SONG,
+      options: { modes: ['white_noise'], perturbation: 0.8 },
+    });
+
+    expect(coreAddon.process).toHaveBeenCalledTimes(1);
   });
 });
 

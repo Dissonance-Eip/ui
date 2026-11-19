@@ -51,10 +51,6 @@ export class ProcessingFlow {
       return;
     }
     const options = buildProcessingOptions(this.analyzeView.getProcessingModes?.() ?? []);
-    if (!options) {
-      this.logger?.setStatus?.('Select at least one processing mode');
-      return;
-    }
     const operationId = ++this._activeOperationId;
     this.analyzeView.clearError();
     try {

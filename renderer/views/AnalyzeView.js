@@ -232,7 +232,7 @@ export class AnalyzeView extends BaseComponent {
     }
 
     if (this.processBtn) {
-      this.processBtn.disabled = !canProcess(this._processEnabled, selectedLabels);
+      this.processBtn.disabled = !canProcess(this._processEnabled);
     }
   }
 }
