@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import { IpcChannels } from '../ipcHandlers/ipcChannels.js';
 import { UiLogForwarder } from '../ipcHandlers/UiLogForwarder.js';
 import { FileDialogHandlers } from '../ipcHandlers/FileDialogHandlers.js';
+import { registerWavCheckHandler } from '../ipcHandlers/wavFileCheck.js';
 import { registerThemeHandlers } from '../ipcHandlers/themeHandlers.js';
 import { CoreIpcHandlers } from '../ipcHandlers/core/CoreIpcHandlers.js';
 import { FLUSH_REQUEST_CHANNEL, FLUSH_DONE_CHANNEL } from '../main/windowFlush.js';
@@ -66,6 +67,7 @@ function registerMainSide() {
   const ipc = makeHandlingIpc();
   new UiLogForwarder({ ipc }).register();
   new FileDialogHandlers({ ipc }).register();
+  registerWavCheckHandler({ ipc });
   registerThemeHandlers({
     ipc,
     nativeTheme: new EventEmitter(),

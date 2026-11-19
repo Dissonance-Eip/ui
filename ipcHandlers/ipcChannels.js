@@ -8,6 +8,7 @@
 const IpcChannels = Object.freeze({
   // renderer → main, request/response (ipcRenderer.invoke ↔ ipcMain.handle)
   DIALOG_OPEN_FILE: 'dialog:openFile',
+  FILE_CHECK_WAV: 'file:checkWav',
   UI_GET_SYSTEM_THEME: 'ui:getSystemTheme',
   CORE_PROCESS: 'core:process',
   CORE_READ_METADATA: 'core:readMetadata',

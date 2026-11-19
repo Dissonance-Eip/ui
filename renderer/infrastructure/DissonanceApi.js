@@ -23,6 +23,10 @@ export class DissonanceApi extends BaseApi {
     return this._call('readFileMetadata', filePath);
   }
 
+  async checkWavFile(filePath) {
+    return this._call('checkWavFile', filePath);
+  }
+
   async cleanupProcessedFile(processedPath) {
     return this._call('cleanupProcessedFile', processedPath);
   }
