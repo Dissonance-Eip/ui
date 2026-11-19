@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   hasDroppedFiles,
+  isWavPath,
   promptForFile,
   resolveDroppedPath,
 } from '../renderer/services/fileSelection.js';
@@ -70,5 +71,24 @@ describe('hasDroppedFiles', () => {
     expect(hasDroppedFiles({})).toBe(false);
     expect(hasDroppedFiles({ files: [] })).toBe(false);
     expect(hasDroppedFiles({ files: [{}] })).toBe(true);
+  });
+});
+
+describe('isWavPath', () => {
+  it.each(['/music/song.wav', '/music/SONG.WAV', 'C:\\Music\\song.Wav'])('accepts %s', (p) => {
+    expect(isWavPath(p)).toBe(true);
+  });
+
+  it.each([
+    '/music/song.mp3',
+    '/music/song.flac',
+    '/music/song.wav.mp3',
+    '/music/wav',
+    '/music/song',
+    '',
+    null,
+    undefined,
+  ])('refuses %s', (p) => {
+    expect(isWavPath(p)).toBe(false);
   });
 });

@@ -199,7 +199,7 @@ class CoreIpcHandlers {
       const { canceled, filePath } = await this.dialog.showSaveDialog({
         title: 'Export processed file',
         defaultPath: this.exportNames.get(processedPath) ?? path.basename(processedPath),
-        filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
+        filters: [{ name: 'WAV audio', extensions: ['wav'] }],
       });
       if (canceled || !filePath) return { ok: false, error: 'Export canceled' };
 

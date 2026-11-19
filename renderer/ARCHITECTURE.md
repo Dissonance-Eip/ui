@@ -27,12 +27,12 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `ViewRouter.js` — show-one-hide-others switcher for the three top-level views.
 - `renderer/controllers/`
   - `AppController.js` — thin coordinator: builds the flows below and wires view, window and main-process events (quit flush, multi-window pause/refresh, core status) to them.
-  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard.
+  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard. Refuses a non-WAV before anything changes, with a message on Upload, or on Analyze when a file is shown (ui#82).
   - `ProcessingFlow.js` — process → Compare, export, restart; the operation id that discards a result arriving after a restart.
   - `TagEditSession.js` — the TagWriteQueue, playback↔queue coordination, what a form snapshot may write (#111), and the pause-and-flush chokepoint.
   - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.
 - `renderer/views/`
-  - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
+  - `UploadView.js` — drop zone host (delegates to the `DropZone` component) + an error alert (`showError` / `clearError`, `role="alert"`) for a refused file.
   - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button + an error alert (`showError` / `clearError`, `role="alert"`; cleared when another file is shown). Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
   - `renderWavInfo.js` — writes a WAV info panel (filename, duration, sample rate, channels); shared by AnalyzeView and CompareView.
@@ -41,7 +41,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, in-place theme repaint (keeps the player and its audio, so playback continues), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
 - `renderer/services/`
   - `TagWriteQueue.js` — serialised, blockable queue for writing WAV tag metadata. Per-snapshot filePath, flush-on-quit, error recovery.
-  - `fileSelection.js` — `promptForFile()` (open dialog) and `resolveDroppedPath()`; every file pick goes through them, so a file-type check belongs here.
+  - `fileSelection.js` — `promptForFile()` (open dialog), `resolveDroppedPath()`, and `isWavPath()`, the WAV-only check `FileImportFlow.importFile` applies to every import.
   - `WavMetadataService.js` — converts `core:readMetadata` responses into the display-friendly basicInfo shape.
 - `renderer/state/`
   - `AppState.js` — current + processed file paths. `setCurrentFilePath` deliberately clears `processedFilePath`.

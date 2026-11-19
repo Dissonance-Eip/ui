@@ -45,13 +45,13 @@ describe('FileDialogHandlers — dialog:openFile', () => {
     }
   );
 
-  it('only offers the supported audio formats', async () => {
+  it('only offers WAV, the one format the core reads', async () => {
     const { openFile, dialog } = makeOpenFile();
 
     await openFile();
 
     expect(dialog.showOpenDialog.mock.calls[0][0].filters).toEqual([
-      { name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] },
+      { name: 'WAV audio', extensions: ['wav'] },
     ]);
   });
 

@@ -9,6 +9,7 @@ import {
   makeLogger,
   makeAnalyzeView,
   makeCompareView,
+  makeUploadView,
 } from './helpers/fakeRenderer.js';
 
 const FILE_A = '/music/a.wav';
@@ -42,7 +43,7 @@ function makeController() {
     logger: makeLogger(),
     router: { show: vi.fn() },
     state: new AppState(),
-    uploadView: {},
+    uploadView: makeUploadView(),
     analyzeView,
     compareView: makeCompareView(),
     headerEl: null,
