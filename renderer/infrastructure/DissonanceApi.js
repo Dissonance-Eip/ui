@@ -43,6 +43,11 @@ export class DissonanceApi extends BaseApi {
     return this._call('exportFile', processedPath);
   }
 
+  /** `{ ok: true }`, or `{ ok: false, code: 'ENGINE_UNAVAILABLE', reason }`. */
+  async getEngineStatus() {
+    return this._call('getEngineStatus');
+  }
+
   onCoreStatus(cb) {
     return this._call('onCoreStatus', cb);
   }

@@ -27,8 +27,10 @@ const OTHER = '/music/other.wav';
 const PROCESSED = '/tmp/out.wav';
 const TAGS = Object.freeze({ title: 'Song', artist: 'Band' });
 
-function startApp({ modes } = {}) {
+function startApp({ modes, engineStatus } = {}) {
   const bridge = makeBridge({ processedPath: PROCESSED });
+  if (engineStatus instanceof Error) bridge.getEngineStatus.mockRejectedValue(engineStatus);
+  else if (engineStatus) bridge.getEngineStatus.mockResolvedValue(engineStatus);
   const win = makeEventTarget();
   vi.stubGlobal('window', Object.assign(win, { dissonance: bridge }));
   const restartBtn = makeEventTarget();
@@ -535,5 +537,63 @@ describe('AppController — restart', () => {
     await settle();
 
     expect(app.analyzeView.setBasicWavInfo).toHaveBeenLastCalledWith(null);
+  });
+});
+
+describe('AppController — engine unavailable (#148)', () => {
+  const UNAVAILABLE = Object.freeze({
+    ok: false,
+    error: 'Core addon readMetadata not available',
+    code: 'ENGINE_UNAVAILABLE',
+    reason: 'Core engine unavailable (bindings: not found)',
+  });
+  const MESSAGE = /audio engine could not be loaded/;
+
+  it('says so on Upload at startup when the engine did not load', async () => {
+    const app = startApp({ engineStatus: UNAVAILABLE });
+    await settle();
+
+    expect(app.bridge.getEngineStatus).toHaveBeenCalledTimes(1);
+    expect(app.uploadView.showEngineError).toHaveBeenCalledWith(expect.stringMatching(MESSAGE));
+    expect(app.logger.setStatus).toHaveBeenLastCalledWith(expect.stringMatching(MESSAGE), true);
+  });
+
+  it('keeps Process unavailable for an imported file', async () => {
+    const app = startApp({ engineStatus: UNAVAILABLE });
+    await settle();
+
+    await importSong(app);
+
+    expect(app.analyzeView.setProcessEnabled).toHaveBeenLastCalledWith(false);
+    expect(app.analyzeView.setProcessEnabled).not.toHaveBeenCalledWith(true);
+  });
+
+  it('shows nothing when the engine loaded', async () => {
+    const app = startApp();
+    await settle();
+
+    expect(app.uploadView.showEngineError).not.toHaveBeenCalled();
+  });
+
+  it('shows the message on Analyze when a metadata read answers ENGINE_UNAVAILABLE', async () => {
+    const app = startApp();
+    await settle();
+    app.bridge.readFileMetadata.mockResolvedValueOnce(UNAVAILABLE);
+
+    await app.controller.importFile(SONG, 'Dropped');
+    await settle();
+
+    expect(app.analyzeView.showError).toHaveBeenCalledTimes(1);
+    expect(app.analyzeView.showError).toHaveBeenCalledWith(expect.stringMatching(MESSAGE));
+    expect(app.uploadView.showEngineError).toHaveBeenCalledWith(expect.stringMatching(MESSAGE));
+    expect(app.analyzeView.setProcessEnabled).toHaveBeenLastCalledWith(false);
+  });
+
+  it('logs and carries on when the status request itself fails', async () => {
+    const app = startApp({ engineStatus: new Error('ipc gone') });
+    await settle();
+
+    expect(app.logger.error).toHaveBeenCalledWith(expect.stringMatching(/ipc gone/));
+    expect(app.uploadView.showEngineError).not.toHaveBeenCalled();
   });
 });

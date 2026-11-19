@@ -15,6 +15,7 @@ const IpcChannels = Object.freeze({
   CORE_WRITE_TAGS: 'core:writeTags',
   CORE_EXPORT: 'core:export',
   CORE_CLEANUP_PROCESSED: 'core:cleanupProcessed',
+  CORE_ENGINE_STATUS: 'core:engineStatus',
 
   // renderer → main, fire-and-forget (ipcRenderer.send ↔ ipcMain.on)
   UI_LOG: 'ui:log',

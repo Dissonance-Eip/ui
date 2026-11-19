@@ -103,6 +103,7 @@ export function makeUploadView() {
     unmount: vi.fn(),
     showError: vi.fn(),
     clearError: vi.fn(),
+    showEngineError: vi.fn(),
   };
 }
 
@@ -143,6 +144,7 @@ export function makeBridge({
     exportFile: vi.fn(async () => ({ ok: true, exportedPath: '/out/song.wav' })),
     cleanupProcessedFile: vi.fn(async () => {}),
     getSystemTheme: vi.fn(async () => ({ mode: themeMode })),
+    getEngineStatus: vi.fn(async () => ({ ok: true })),
     logToMain: vi.fn(),
     isDevelopment: vi.fn(() => isDevelopment),
     onCoreStatus: subscription('onCoreStatus'),

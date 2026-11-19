@@ -10,6 +10,12 @@ export class AppState {
     this.currentFilePath = null;
     this.processedFilePath = null;
     this.lastImportedFilePath = null;
+    // False once main says the native engine could not be loaded (#148).
+    this.engineAvailable = true;
+  }
+
+  setEngineUnavailable() {
+    this.engineAvailable = false;
   }
 
   /**
@@ -29,6 +35,11 @@ export class AppState {
 
   hasCurrentFile() {
     return !!this.currentFilePath;
+  }
+
+  /** A file is shown and the engine can process it. */
+  canProcess() {
+    return this.hasCurrentFile() && this.engineAvailable;
   }
 
   hasProcessedFile() {

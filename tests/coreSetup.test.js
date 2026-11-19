@@ -15,6 +15,7 @@ const CORE_CHANNELS = [
   IpcChannels.CORE_READ_METADATA,
   IpcChannels.CORE_WRITE_TAGS,
   IpcChannels.CORE_EXPORT,
+  IpcChannels.CORE_ENGINE_STATUS,
 ];
 
 function makeAddon(tags = { title: 'Old' }) {

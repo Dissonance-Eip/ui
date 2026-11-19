@@ -64,6 +64,7 @@ describe('CoreIpcHandlers — registration', () => {
     expect([...ipc.handlers.keys()].sort()).toEqual(
       [
         'core:cleanupProcessed',
+        'core:engineStatus',
         'core:export',
         'core:process',
         'core:readMetadata',
@@ -231,6 +232,22 @@ describe('CoreIpcHandlers — engine unavailable', () => {
       code: ENGINE_UNAVAILABLE,
       reason: loadError.message,
     });
+  });
+
+  it('core:engineStatus answers ENGINE_UNAVAILABLE with the load reason', async () => {
+    const { invoke } = setup({ coreAddon: null, coreLoadError: loadError });
+
+    expect(await invoke('core:engineStatus')).toMatchObject({
+      ok: false,
+      code: ENGINE_UNAVAILABLE,
+      reason: loadError.message,
+    });
+  });
+
+  it('core:engineStatus answers ok when the addon loaded', async () => {
+    const { invoke } = setup();
+
+    expect(await invoke('core:engineStatus')).toEqual({ ok: true });
   });
 
   it('flags a loaded addon that lacks the function, without a load reason', async () => {
