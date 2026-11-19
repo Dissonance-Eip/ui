@@ -94,6 +94,62 @@ describe('FileImportFlow.importFile', () => {
   });
 });
 
+describe('FileImportFlow — other entry points', () => {
+  it('readFileMetadata ignores an empty path', async () => {
+    const { flow, api } = makeFlow();
+
+    await flow.readFileMetadata(null);
+
+    expect(api.readFileMetadata).not.toHaveBeenCalled();
+  });
+
+  it('changeFile imports the picked file', async () => {
+    const { flow, api, state } = makeFlow();
+    api.openFile.mockResolvedValueOnce(SONG);
+
+    await flow.changeFile();
+    await settle();
+
+    expect(state.currentFilePath).toBe(SONG);
+  });
+
+  it('a window drop imports the resolved path', async () => {
+    const { flow, api, state } = makeFlow();
+    api.getPathForFile.mockReturnValueOnce(SONG);
+
+    flow.handleWindowDrop(makeDragEvent([{ name: 'song.wav' }]));
+    await settle();
+
+    expect(state.currentFilePath).toBe(SONG);
+  });
+
+  it('dragover without a dataTransfer only prevents the default', () => {
+    const { flow } = makeFlow();
+    const event = { preventDefault: vi.fn() };
+
+    flow.handleWindowDragOver(event);
+
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it('clear() forgets the shown file’s info', async () => {
+    const { flow } = makeFlow();
+    await flow.importFile(SONG, 'Dropped');
+
+    flow.clear();
+
+    expect(flow.originalInfo).toBeNull();
+  });
+
+  it('clear() hides the refusal message', () => {
+    const { flow, uploadView } = makeFlow();
+
+    flow.clear();
+
+    expect(uploadView.clearError).toHaveBeenCalled();
+  });
+});
+
 describe('FileImportFlow — refusing a file that is not a WAV', () => {
   const REFUSAL = 'Only WAV files are supported. "track.mp3" was not imported.';
 
@@ -159,62 +215,6 @@ describe('FileImportFlow — refusing a file that is not a WAV', () => {
     await flow.importFile(MP3, 'Dropped');
 
     await flow.importFile(SONG, 'Dropped');
-
-    expect(uploadView.clearError).toHaveBeenCalled();
-  });
-});
-
-describe('FileImportFlow — other entry points', () => {
-  it('readFileMetadata ignores an empty path', async () => {
-    const { flow, api } = makeFlow();
-
-    await flow.readFileMetadata(null);
-
-    expect(api.readFileMetadata).not.toHaveBeenCalled();
-  });
-
-  it('changeFile imports the picked file', async () => {
-    const { flow, api, state } = makeFlow();
-    api.openFile.mockResolvedValueOnce(SONG);
-
-    await flow.changeFile();
-    await settle();
-
-    expect(state.currentFilePath).toBe(SONG);
-  });
-
-  it('a window drop imports the resolved path', async () => {
-    const { flow, api, state } = makeFlow();
-    api.getPathForFile.mockReturnValueOnce(SONG);
-
-    flow.handleWindowDrop(makeDragEvent([{ name: 'song.wav' }]));
-    await settle();
-
-    expect(state.currentFilePath).toBe(SONG);
-  });
-
-  it('dragover without a dataTransfer only prevents the default', () => {
-    const { flow } = makeFlow();
-    const event = { preventDefault: vi.fn() };
-
-    flow.handleWindowDragOver(event);
-
-    expect(event.preventDefault).toHaveBeenCalled();
-  });
-
-  it('clear() forgets the shown file’s info', async () => {
-    const { flow } = makeFlow();
-    await flow.importFile(SONG, 'Dropped');
-
-    flow.clear();
-
-    expect(flow.originalInfo).toBeNull();
-  });
-
-  it('clear() hides the refusal message', () => {
-    const { flow, uploadView } = makeFlow();
-
-    flow.clear();
 
     expect(uploadView.clearError).toHaveBeenCalled();
   });
