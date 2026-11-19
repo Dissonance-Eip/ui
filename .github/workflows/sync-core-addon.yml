@@ -7,9 +7,6 @@ on:
         description: 'core release tag to sync, e.g. v0.0.6-rc.1 (empty = latest release, which skips pre-releases)'
         required: false
         default: ''
-  repository_dispatch:
-    types:
-      - core-release
   push:
     branches:
       - main
