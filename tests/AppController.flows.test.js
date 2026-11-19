@@ -177,6 +177,21 @@ describe('AppController — import flow', () => {
     expect(app.logger.setStatus).toHaveBeenLastCalledWith('Metadata failed: unreadable', true);
   });
 
+  it('shows a failed metadata read on Analyze', async () => {
+    const app = startApp();
+    app.bridge.readFileMetadata.mockResolvedValueOnce({
+      ok: false,
+      error: 'Error: Failed to read WAV',
+    });
+
+    await app.controller.importFile(SONG, 'Dropped');
+    await settle();
+
+    expect(app.analyzeView.showError).toHaveBeenLastCalledWith(
+      'Could not read this file: Failed to read WAV'
+    );
+  });
+
   it('logs a metadata read that throws', async () => {
     const app = startApp();
     app.bridge.readFileMetadata.mockRejectedValueOnce(new Error('ipc down'));
@@ -371,6 +386,28 @@ describe('AppController — process flow', () => {
     expect(app.state.processedFilePath).toBeNull();
   });
 
+  it('shows the failure on Analyze and lets the user retry (F30: truncated WAV)', async () => {
+    const app = startApp();
+    await importSong(app);
+    app.bridge.processFile.mockResolvedValueOnce({
+      ok: false,
+      error: 'Error: Failed to read audio data',
+    });
+
+    await app.controller.processCurrentFile();
+
+    expect(lastScreen(app.router)).toBe('analyze');
+    expect(app.analyzeView.showError).toHaveBeenLastCalledWith(
+      'Could not process this file: Failed to read audio data'
+    );
+    expect(app.analyzeView.setProcessEnabled).toHaveBeenLastCalledWith(true);
+
+    await app.controller.processCurrentFile();
+
+    expect(lastScreen(app.router)).toBe('compare');
+    expect(app.analyzeView.clearError).toHaveBeenCalled();
+  });
+
   it('goes back to Analyze when the core call throws', async () => {
     const app = startApp();
     await importSong(app);
@@ -547,6 +584,7 @@ describe('AppController — engine unavailable (#148)', () => {
     await app.controller.importFile(SONG, 'Dropped');
     await settle();
 
+    expect(app.analyzeView.showError).toHaveBeenCalledTimes(1);
     expect(app.analyzeView.showError).toHaveBeenCalledWith(expect.stringMatching(MESSAGE));
     expect(app.uploadView.showEngineError).toHaveBeenCalledWith(expect.stringMatching(MESSAGE));
     expect(app.analyzeView.setProcessEnabled).toHaveBeenLastCalledWith(false);

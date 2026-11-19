@@ -94,6 +94,31 @@ describe('FileImportFlow.importFile', () => {
   });
 });
 
+describe('FileImportFlow — metadata errors', () => {
+  it('shows a read that throws on Analyze', async () => {
+    const { flow, api, analyzeView } = makeFlow();
+    api.readFileMetadata.mockRejectedValueOnce(new Error('ipc down'));
+
+    await flow.importFile(SONG, 'Dropped');
+    await settle();
+
+    expect(analyzeView.showError).toHaveBeenCalledWith('Could not read this file: ipc down');
+  });
+
+  it('shows nothing for a stale read that fails', async () => {
+    const { flow, api, analyzeView } = makeFlow();
+    const first = deferred();
+    api.readFileMetadata.mockReturnValueOnce(first.promise);
+
+    await flow.importFile(SONG, 'Dropped');
+    await flow.importFile(OTHER, 'Dropped');
+    first.resolve({ ok: false, error: 'Error: late' });
+    await settle();
+
+    expect(analyzeView.showError).not.toHaveBeenCalled();
+  });
+});
+
 describe('FileImportFlow — other entry points', () => {
   it('readFileMetadata ignores an empty path', async () => {
     const { flow, api } = makeFlow();

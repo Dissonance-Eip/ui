@@ -15,6 +15,7 @@
 import { isWavPath, promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
 import { basename } from '../utils/pathUtils.js';
 import { ENGINE_UNAVAILABLE_MESSAGE, isEngineUnavailable } from '../utils/engineStatus.js';
+import { userErrorReason } from '../utils/errorMessage.js';
 
 export class FileImportFlow {
   /**
@@ -116,11 +117,18 @@ export class FileImportFlow {
       if (isEngineUnavailable(resp)) {
         this.analyzeView.showError(ENGINE_UNAVAILABLE_MESSAGE);
         this.onEngineUnavailable?.();
+        return;
       }
+      this._showReadError(errMsg);
     } catch (err) {
       if (!this._isCurrentRead(readId, filePath)) return;
       this.logger?.error?.(`Metadata failed: ${err}`);
+      this._showReadError(err);
     }
+  }
+
+  _showReadError(error) {
+    this.analyzeView.showError(`Could not read this file: ${userErrorReason(error)}`);
   }
 
   _showReadMetadata(filePath, resp) {
