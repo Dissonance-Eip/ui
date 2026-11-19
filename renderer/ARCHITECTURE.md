@@ -27,7 +27,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `ViewRouter.js` — show-one-hide-others switcher for the three top-level views.
 - `renderer/controllers/`
   - `AppController.js` — thin coordinator: builds the flows below and wires view, window and main-process events (quit flush, multi-window pause/refresh, core status) to them.
-  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard.
+  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard. Refuses a non-WAV with an on-screen message before anything changes (ui#82).
   - `ProcessingFlow.js` — process → Compare, export, restart; the operation id that discards a result arriving after a restart.
   - `TagEditSession.js` — the TagWriteQueue, playback↔queue coordination, what a form snapshot may write (#111), and the pause-and-flush chokepoint.
   - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.
@@ -37,11 +37,12 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
   - `renderWavInfo.js` — writes a WAV info panel (filename, duration, sample rate, channels); shared by AnalyzeView and CompareView.
 - `renderer/components/`
+  - `AlertMessage.js` — the app-wide `role="alert"` message (`#appAlert`) above every screen: `show(text)` / `clear()`. Passed to the flows as `alertMessage`.
   - `DropZone.js` — drag/drop + click-to-open file picker. Falls back to the native dialog when a dropped file has no resolvable path.
   - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, in-place theme repaint (keeps the player and its audio, so playback continues), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
 - `renderer/services/`
   - `TagWriteQueue.js` — serialised, blockable queue for writing WAV tag metadata. Per-snapshot filePath, flush-on-quit, error recovery.
-  - `fileSelection.js` — `promptForFile()` (open dialog) and `resolveDroppedPath()`; every file pick goes through them, so a file-type check belongs here.
+  - `fileSelection.js` — `promptForFile()` (open dialog), `resolveDroppedPath()`, and `isWavPath()`, the WAV-only check `FileImportFlow.importFile` applies to every import.
   - `WavMetadataService.js` — converts `core:readMetadata` responses into the display-friendly basicInfo shape.
 - `renderer/state/`
   - `AppState.js` — current + processed file paths. `setCurrentFilePath` deliberately clears `processedFilePath`.

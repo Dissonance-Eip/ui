@@ -25,6 +25,7 @@ import { AnalyzeView } from '../views/AnalyzeView.js';
 import { CompareView } from '../views/CompareView.js';
 import { AppController } from '../controllers/AppController.js';
 import { WavMetadataService } from '../services/WavMetadataService.js';
+import { AlertMessage } from '../components/AlertMessage.js';
 import { exposeDebugGlobals } from './debugGlobals.js';
 
 /**
@@ -122,6 +123,7 @@ export function bootstrap() {
 
   const controller = new AppController({
     api,
+    alertMessage: new AlertMessage(document.getElementById('appAlert')),
     logger,
     router,
     state,

@@ -17,6 +17,7 @@ import {
 
 const SONG = '/music/song.wav';
 const OTHER = '/music/other.wav';
+const MP3 = '/music/track.mp3';
 const TAGS = Object.freeze({ title: 'Song' });
 
 function makeFlow() {
@@ -30,6 +31,7 @@ function makeFlow() {
     tags: makeTagSession(),
     screens: makeScreens(),
     discardProcessedFile: vi.fn(),
+    alertMessage: { show: vi.fn(), clear: vi.fn() },
   };
   return { flow: new FileImportFlow(deps), ...deps };
 }
@@ -91,6 +93,83 @@ describe('FileImportFlow.importFile', () => {
   });
 });
 
+describe('FileImportFlow — refusing a file that is not a WAV', () => {
+  const REFUSAL = 'Only WAV files are supported. "track.mp3" was not imported.';
+
+  function expectRefused({ api, tags, discardProcessedFile, screens, logger, alertMessage }) {
+    expect(alertMessage.show).toHaveBeenCalledWith(REFUSAL);
+    expect(logger.setStatus).toHaveBeenCalledWith(REFUSAL, true);
+    expect(tags.pauseAndFlush).not.toHaveBeenCalled();
+    expect(discardProcessedFile).not.toHaveBeenCalled();
+    expect(screens.showAnalyze).not.toHaveBeenCalled();
+    expect(api.readFileMetadata).not.toHaveBeenCalled();
+  }
+
+  it('importFile refuses it and touches nothing', async () => {
+    const deps = makeFlow();
+
+    await deps.flow.importFile(MP3, 'Dropped');
+
+    expectRefused(deps);
+    expect(deps.state.currentFilePath).toBeNull();
+  });
+
+  it('keeps the shown file, its output and its tag edits on Analyze', async () => {
+    const deps = makeFlow();
+    await deps.flow.importFile(SONG, 'Dropped');
+    await settle();
+    for (const spy of [
+      deps.tags.pauseAndFlush,
+      deps.discardProcessedFile,
+      deps.screens.showAnalyze,
+    ])
+      spy.mockClear();
+    deps.api.readFileMetadata.mockClear();
+
+    await deps.flow.importFile(MP3, 'Selected');
+
+    expectRefused(deps);
+    expect(deps.state.currentFilePath).toBe(SONG);
+  });
+
+  it('a window drop of an MP3 is refused', async () => {
+    const deps = makeFlow();
+    deps.api.getPathForFile.mockReturnValueOnce(MP3);
+
+    deps.flow.handleWindowDrop(makeDragEvent([{ name: 'track.mp3' }]));
+    await settle();
+
+    expectRefused(deps);
+  });
+
+  it('"Change file" picking an MP3 is refused', async () => {
+    const deps = makeFlow();
+    deps.api.openFile.mockResolvedValueOnce(MP3);
+
+    await deps.flow.changeFile();
+    await settle();
+
+    expectRefused(deps);
+  });
+
+  it('a WAV imported next clears the message', async () => {
+    const { flow, alertMessage } = makeFlow();
+    await flow.importFile(MP3, 'Dropped');
+
+    await flow.importFile(SONG, 'Dropped');
+
+    expect(alertMessage.clear).toHaveBeenCalled();
+  });
+
+  it('works without an alert message', async () => {
+    const deps = makeFlow();
+    const bare = new FileImportFlow({ ...deps, alertMessage: undefined });
+
+    await expect(bare.importFile(MP3, 'Dropped')).resolves.toBeUndefined();
+    expect(deps.logger.setStatus).toHaveBeenCalledWith(REFUSAL, true);
+  });
+});
+
 describe('FileImportFlow — other entry points', () => {
   it('readFileMetadata ignores an empty path', async () => {
     const { flow, api } = makeFlow();
@@ -136,5 +215,13 @@ describe('FileImportFlow — other entry points', () => {
     flow.clear();
 
     expect(flow.originalInfo).toBeNull();
+  });
+
+  it('clear() hides the refusal message', () => {
+    const { flow, alertMessage } = makeFlow();
+
+    flow.clear();
+
+    expect(alertMessage.clear).toHaveBeenCalled();
   });
 });

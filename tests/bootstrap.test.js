@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { bootstrap } from '../renderer/app/bootstrap.js';
-import { makeBridge, makeDocument, makeWindow, settle } from './helpers/fakeRenderer.js';
+import {
+  makeBridge,
+  makeDocument,
+  makeDragEvent,
+  makeWindow,
+  settle,
+} from './helpers/fakeRenderer.js';
 
 const SCREEN_IDS = ['view-upload', 'view-analyze', 'view-processing', 'view-compare'];
 
@@ -60,6 +66,22 @@ describe('bootstrap', () => {
     await settle();
 
     expect(bridge.openFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an MP3 dropped on the drop zone with a visible message, staying on Upload', async () => {
+    const { doc, bridge } = stubRendererGlobals();
+    bridge.getPathForFile.mockReturnValue('/music/track.mp3');
+    bootstrap();
+
+    doc.elements.get('dropZone').fire('drop', makeDragEvent([{ name: 'track.mp3' }]));
+    await settle();
+
+    const alert = doc.elements.get('appAlert');
+    expect(alert.textContent).toContain('Only WAV files are supported');
+    expect(alert.hidden).toBe(false);
+    expect(doc.elements.get('view-upload').hidden).toBe(false);
+    expect(doc.elements.get('view-analyze').hidden).toBe(true);
+    expect(bridge.readFileMetadata).not.toHaveBeenCalled();
   });
 
   it('exposes the debug globals in a development build only', () => {

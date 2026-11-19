@@ -54,6 +54,12 @@
         </p>
       </header>
       <main class="flex-1 flex flex-col gap-3 px-6 pb-6 box-border">
+        <p
+          id="appAlert"
+          role="alert"
+          class="mx-auto w-full max-w-2xl rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-center text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+          hidden
+        ></p>
         <section id="view-upload">
           <div id="welcome" class="flex-1 flex flex-col items-center justify-center gap-4 py-4">
             <div
@@ -102,7 +108,7 @@
                 />
               </svg>
               <div class="max-w-sm leading-5">
-                Drop an audio file here or
+                Drop a WAV file here or
                 <span class="font-semibold text-blue-800 dark:text-blue-300">choose file</span>
               </div>
             </div>

@@ -1,8 +1,9 @@
 /**
  * Getting a source file onto the Analyze screen:
  *
- *   • importFile → flush the old file's tag edits → show the new file →
- *     read its metadata into the tag form
+ *   • importFile → refuse a non-WAV (message, nothing else changes) →
+ *     flush the old file's tag edits → show the new file → read its
+ *     metadata into the tag form
  *   • changeFile → open dialog → importFile
  *   • a drop anywhere in the window → importFile (and never let Electron
  *     navigate to the dropped file)
@@ -11,15 +12,17 @@
  * file is shown now, so a late reply can't fill the form with the wrong
  * file's tags (#111).
  */
-import { promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
+import { isWavPath, promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
+import { basename } from '../utils/pathUtils.js';
 
 export class FileImportFlow {
   /**
    * @param {{ api: object, logger?: object, state: object, analyzeView: object,
    *   compareView: object, wavMetadataService: object, tags: object,
-   *   screens: object, discardProcessedFile: () => void }} deps
+   *   screens: object, discardProcessedFile: () => void, alertMessage?: object }} deps
    *   tags — the TagEditSession; screens — the ScreenNavigator;
-   *   discardProcessedFile — drops the previous processed temp file.
+   *   discardProcessedFile — drops the previous processed temp file;
+   *   alertMessage — the on-screen AlertMessage a refused file is reported in.
    */
   constructor(deps) {
     this.api = deps.api;
@@ -31,6 +34,7 @@ export class FileImportFlow {
     this.tags = deps.tags;
     this.screens = deps.screens;
     this.discardProcessedFile = deps.discardProcessedFile;
+    this.alertMessage = deps.alertMessage;
 
     // Basic info of the shown source file; Compare shows it next to the output.
     this.originalInfo = null;
@@ -45,6 +49,12 @@ export class FileImportFlow {
    * @param {string} sourceLabel    'Dropped' or 'Selected' — for logging only
    */
   async importFile(filePath, sourceLabel) {
+    if (!isWavPath(filePath)) {
+      this._refuseFile(filePath);
+      return;
+    }
+    this.alertMessage?.clear();
+
     // Capture any tag edits for the OLD file and flush them safely before we
     // touch anything. Also waits for in-flight writes so the read below
     // sees fresh values (matters when reimporting the same file).
@@ -60,6 +70,13 @@ export class FileImportFlow {
 
     // Read WAV metadata immediately so the user can view and edit fields before processing.
     this.readFileMetadata(filePath);
+  }
+
+  /** Say why `filePath` was not imported; the shown file, if any, stays. */
+  _refuseFile(filePath) {
+    const message = `Only WAV files are supported. "${basename(filePath)}" was not imported.`;
+    this.logger?.setStatus?.(message, true);
+    this.alertMessage?.show(message);
   }
 
   /** Show `filePath` with placeholder info until its metadata arrives. */
@@ -118,9 +135,10 @@ export class FileImportFlow {
     if (filePath) this.importFile(filePath, 'Selected');
   }
 
-  /** Forget the shown file's info (back to Upload). */
+  /** Forget the shown file's info and any refusal message (back to Upload). */
   clear() {
     this.originalInfo = null;
+    this.alertMessage?.clear();
   }
 
   /** Window-level dragover: allow the drop and show the copy cursor. */

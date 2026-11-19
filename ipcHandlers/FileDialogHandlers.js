@@ -1,6 +1,6 @@
 /**
- * `dialog:openFile` IPC — shows the native OS file picker filtered to audio
- * formats, returns the absolute path or `null` if the user canceled.
+ * `dialog:openFile` IPC — shows the native OS file picker filtered to WAV
+ * (the only format the core reads), returns the absolute path or `null` if the user canceled.
  * The renderer may pass the last imported file path; the dialog then opens
  * in that file's folder.
  */
@@ -24,7 +24,7 @@ class FileDialogHandlers {
         properties: ['openFile'],
         defaultPath:
           typeof lastFilePath === 'string' && lastFilePath ? path.dirname(lastFilePath) : undefined,
-        filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'm4a', 'flac'] }],
+        filters: [{ name: 'WAV audio', extensions: ['wav'] }],
       });
       if (canceled || !filePaths || filePaths.length === 0) return null;
       return filePaths[0];
