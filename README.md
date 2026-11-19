@@ -181,7 +181,15 @@ A relative path is resolved against the directory you launch from.
 
 ### Syncing binaries from the core repo
 
-The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts from the most recent core GitHub Release into `Build/Release/`. It fires automatically on push to `main` and on `repository_dispatch` from core's `release-addon.yml`. To trigger manually: run the workflow from the Actions tab.
+The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts from a core GitHub Release into `Build/Release/`. It writes the tag of that release to `Build/Release/CORE_VERSION`, so the committed binaries always say which core release they come from. It fires automatically on push to `main` and on `repository_dispatch` from core's `release-addon.yml`. To trigger it manually, run "Sync Core Addon into UI" from the Actions tab. Its `core_tag` input picks a release (for example a `vX.Y.Z-rc.N` pre-release). Left empty, it takes the latest release, which skips pre-releases.
+
+`main` is protected, so the workflow does not push to it. It commits the new binaries to the `chore/sync-core-addon` branch and opens a pull request into `main`, or updates the one already open. If nothing changed, or the open pull request already has the same binaries, it does nothing. A pull request opened by the workflow's `GITHUB_TOKEN` does not start other workflows, so the required `Lint, Format, Test, Build` check does not run on it. Close and reopen the pull request to run the checks, then review and merge it as usual.
+
+One-time setup by a repository admin:
+
+1. Create a fine-grained personal access token: resource owner `Dissonance-Eip`, repository access "Only select repositories" with `Dissonance-Eip/core` only, repository permission **Contents: Read-only** (GitHub adds Metadata: Read-only on its own). Nothing else. If the organization requires approval for fine-grained tokens, an owner approves the request. Note the expiry date and renew the token before then.
+2. Store it in `ui` as the repository secret `CORE_RELEASES_TOKEN` (Settings → Secrets and variables → Actions). The workflow fails with a clear error while the secret is missing. The default `GITHUB_TOKEN` cannot read the private core repository, which is why `gh release download` reported "release not found" without it.
+3. In `ui` Settings → Actions → General → Workflow permissions, tick "Allow GitHub Actions to create and approve pull requests". Without it the workflow cannot open the pull request. If the checkbox is greyed out, an organization owner must first allow it in the organization's Actions settings.
 
 ---
 
