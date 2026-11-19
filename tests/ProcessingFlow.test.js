@@ -90,12 +90,12 @@ describe('ProcessingFlow.process', () => {
     expect(screens.showAnalyze).toHaveBeenCalled();
   });
 
-  it('does not run the core without a mode', async () => {
+  it('asks for an explicit pass-through (strength 0) without a mode', async () => {
     const { flow, api } = makeFlow({ modes: [] });
 
     await flow.process();
 
-    expect(api.processFile).not.toHaveBeenCalled();
+    expect(api.processFile).toHaveBeenCalledWith(SONG, { modes: [], perturbation: 0 });
   });
 
   it('a restart invalidates the in-flight run', async () => {

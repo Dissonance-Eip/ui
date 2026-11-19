@@ -124,7 +124,7 @@ Seven WAV tag fields (title, artist, date, genre, comment, copyright, software) 
 
 ### Protection modes
 
-Processing is mode-driven. Select one or more modes on the Analyze view, then press Process. The modes are White Noise, Phase Distortion, Spectral Gate, and Pink Noise. This build uses the project's validated default protection strength; a strength control will return once every mode is finalized.
+Processing is mode-driven. Select one or more modes on the Analyze view, then press Process. The modes are White Noise, Phase Distortion, Spectral Gate, and Pink Noise. With no mode selected, Process leaves the audio unchanged (only edited tags are written). This build uses the project's validated default protection strength; a strength control will return once every mode is finalized.
 
 ### Waveform
 

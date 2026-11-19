@@ -1,27 +1,28 @@
 /**
  * Builds the options object the renderer sends with a process request.
  *
- * Two entry points feed it:
- *   - explicitly selected modes: the safe default strength applies.
- *   - no modes selected: no processing request is made (returns null).
+ *   - selected modes: the validated default strength (0.8) applies.
+ *   - no mode selected: an explicit pass-through, strength 0. The audio is
+ *     left untouched (F27); never an empty object, which older cores read as
+ *     "use the default perturbation".
  *
- * When modes are selected, the validated default strength of 0.8 is used.
  * The protection strength slider has been removed; processing is mode-driven only.
  *
- * @param {string[]} modes - Non-empty array of selected processing modes
- * @returns {object|null} { modes, perturbation: 0.8 } or null if no modes
+ * @param {string[]} [modes] - Selected processing modes
+ * @returns {{modes: string[], perturbation: number}}
  */
 
 export const DEFAULT_PERTURBATION = 0.8;
+export const PASS_THROUGH_PERTURBATION = 0;
 
-/** Returns true if processing can proceed (has file and at least one mode). */
-export function canProcess(hasFile, modes) {
-  return !!(hasFile && modes && modes.length > 0);
+/** Returns true if processing can proceed: a file is loaded (no mode = pass-through). */
+export function canProcess(hasFile) {
+  return !!hasFile;
 }
 
 export function buildProcessingOptions(modes) {
   if (!modes || modes.length === 0) {
-    return null;
+    return { modes: [], perturbation: PASS_THROUGH_PERTURBATION };
   }
   return { modes, perturbation: DEFAULT_PERTURBATION };
 }

@@ -22,12 +22,12 @@ describe('buildProcessingOptions & canProcess', () => {
       expect(options).toEqual({ modes, perturbation: 0.8 });
     });
 
-    it('returns null when modes is empty', () => {
-      expect(buildProcessingOptions([])).toBeNull();
+    it('asks for an explicit pass-through (strength 0) when no mode is selected', () => {
+      expect(buildProcessingOptions([])).toEqual({ modes: [], perturbation: 0 });
     });
 
-    it('returns null when modes is undefined', () => {
-      expect(buildProcessingOptions(undefined)).toBeNull();
+    it('asks for an explicit pass-through when modes is undefined', () => {
+      expect(buildProcessingOptions(undefined)).toEqual({ modes: [], perturbation: 0 });
     });
 
     it('preserves the mode list in the returned options', () => {
@@ -46,12 +46,12 @@ describe('buildProcessingOptions & canProcess', () => {
       expect(canProcess(false, ['white_noise'])).toBe(false);
     });
 
-    it('returns false when modes is empty', () => {
-      expect(canProcess(true, [])).toBe(false);
+    it('returns true with a file and no mode (pass-through)', () => {
+      expect(canProcess(true, [])).toBe(true);
     });
 
-    it('returns false when modes is undefined', () => {
-      expect(canProcess(true, undefined)).toBe(false);
+    it('returns true with a file and undefined modes', () => {
+      expect(canProcess(true, undefined)).toBe(true);
     });
 
     it('returns false when hasFile is undefined', () => {
