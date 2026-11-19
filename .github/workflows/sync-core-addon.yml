@@ -81,6 +81,13 @@ jobs:
             exit 0
           fi
 
+          pr=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number')
+          # Re-pushing the same binaries would dismiss the open PR's approval, so skip it.
+          if [ -n "$pr" ] && git fetch -q origin "$BRANCH" && git diff --cached --quiet "origin/$BRANCH" -- Build/Release; then
+            echo "Open sync PR #$pr already has these binaries."
+            exit 0
+          fi
+
           # main is protected by a ruleset (1 approving review), so changes go through a pull request.
           git checkout -B "$BRANCH"
           git commit -m "chore(ui): sync core addon binaries"
@@ -90,7 +97,6 @@ jobs:
 
           This pull request was opened with GITHUB_TOKEN, so it does not trigger the required \"Lint, Format, Test, Build\" check. Close and reopen it to run the checks before merging."
 
-          pr=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number')
           if [ -n "$pr" ]; then
             gh pr edit "$pr" --body "$body"
           else
