@@ -103,6 +103,7 @@ export function makeUploadView() {
     unmount: vi.fn(),
     showError: vi.fn(),
     clearError: vi.fn(),
+    showEngineError: vi.fn(),
   };
 }
 
@@ -137,11 +138,13 @@ export function makeBridge({
     openFile: vi.fn(async () => null),
     getPathForFile: vi.fn(() => null),
     readFileMetadata: vi.fn(async () => metadataReply()),
+    checkWavFile: vi.fn(async () => ({ ok: true })),
     processFile: vi.fn(async () => ({ ok: true, processedPath })),
     writeTags: vi.fn(async () => ({ ok: true })),
     exportFile: vi.fn(async () => ({ ok: true, exportedPath: '/out/song.wav' })),
     cleanupProcessedFile: vi.fn(async () => {}),
     getSystemTheme: vi.fn(async () => ({ mode: themeMode })),
+    getEngineStatus: vi.fn(async () => ({ ok: true })),
     logToMain: vi.fn(),
     isDevelopment: vi.fn(() => isDevelopment),
     onCoreStatus: subscription('onCoreStatus'),

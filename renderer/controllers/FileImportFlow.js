@@ -1,7 +1,8 @@
 /**
  * Getting a source file onto the Analyze screen:
  *
- *   • importFile → refuse a non-WAV (message, nothing else changes) →
+ *   • importFile → refuse a non-WAV or a damaged WAV (message, nothing
+ *     else changes) →
  *     flush the old file's tag edits → show the new file → read its
  *     metadata into the tag form
  *   • changeFile → open dialog → importFile
@@ -14,6 +15,7 @@
  */
 import { isWavPath, promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
 import { basename } from '../utils/pathUtils.js';
+import { ENGINE_UNAVAILABLE_MESSAGE, isEngineUnavailable } from '../utils/engineStatus.js';
 import { userErrorReason } from '../utils/errorMessage.js';
 
 export class FileImportFlow {
@@ -35,6 +37,7 @@ export class FileImportFlow {
     this.screens = deps.screens;
     this.discardProcessedFile = deps.discardProcessedFile;
     this.uploadView = deps.uploadView;
+    this.onEngineUnavailable = deps.onEngineUnavailable;
 
     // Basic info of the shown source file; Compare shows it next to the output.
     this.originalInfo = null;
@@ -49,8 +52,13 @@ export class FileImportFlow {
    * @param {string} sourceLabel    'Dropped' or 'Selected' — for logging only
    */
   async importFile(filePath, sourceLabel) {
+    const name = basename(filePath);
     if (!isWavPath(filePath)) {
-      this._refuseFile(filePath);
+      this._refuseFile(`Only WAV files are supported. "${name}" was not imported.`);
+      return;
+    }
+    if (await this._isDamaged(filePath)) {
+      this._refuseFile(`"${name}" looks incomplete or damaged and was not imported.`);
       return;
     }
     this.uploadView.clearError();
@@ -73,11 +81,27 @@ export class FileImportFlow {
   }
 
   /**
-   * Say why `filePath` was not imported: on Analyze when a file is shown
+   * Whether the main process found `filePath` truncated or not a RIFF/WAVE
+   * (ui#147). When the check itself fails the file is let through: the core
+   * still refuses it on Process.
+   */
+  async _isDamaged(filePath) {
+    try {
+      const resp = await this.api.checkWavFile(filePath);
+      if (resp && resp.ok) return false;
+      this.logger?.log?.(`Refused ${filePath}: ${resp && resp.error}`);
+      return true;
+    } catch (err) {
+      this.logger?.error?.(`WAV check failed, importing anyway: ${err}`);
+      return false;
+    }
+  }
+
+  /**
+   * Show why the file was not imported: on Analyze when a file is shown
    * (it stays), on Upload otherwise.
    */
-  _refuseFile(filePath) {
-    const message = `Only WAV files are supported. "${basename(filePath)}" was not imported.`;
+  _refuseFile(message) {
     this.logger?.setStatus?.(message, true);
     const view = this.state.currentFilePath ? this.analyzeView : this.uploadView;
     view.showError(message);
@@ -92,7 +116,7 @@ export class FileImportFlow {
     this.analyzeView.setSelectedFile(filePath);
     this.analyzeView.setBasicWavInfo(this.originalInfo);
     this.analyzeView.setAudioPreviewFile(filePath);
-    this.analyzeView.setProcessEnabled(true);
+    this.analyzeView.setProcessEnabled(this.state.canProcess());
   }
 
   /** Read `filePath`'s metadata into the form, unless another file is shown by then. */
@@ -112,6 +136,11 @@ export class FileImportFlow {
       }
       const errMsg = resp && resp.error ? resp.error : 'Unknown error';
       this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
+      if (isEngineUnavailable(resp)) {
+        this.analyzeView.showError(ENGINE_UNAVAILABLE_MESSAGE);
+        this.onEngineUnavailable?.();
+        return;
+      }
       this._showReadError(errMsg);
     } catch (err) {
       if (!this._isCurrentRead(readId, filePath)) return;

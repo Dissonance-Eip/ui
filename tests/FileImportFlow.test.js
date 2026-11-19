@@ -19,6 +19,7 @@ import {
 const SONG = '/music/song.wav';
 const OTHER = '/music/other.wav';
 const MP3 = '/music/track.mp3';
+const DAMAGED = '/music/track.wav';
 const TAGS = Object.freeze({ title: 'Song' });
 
 function makeFlow() {
@@ -242,5 +243,52 @@ describe('FileImportFlow — refusing a file that is not a WAV', () => {
     await flow.importFile(SONG, 'Dropped');
 
     expect(uploadView.clearError).toHaveBeenCalled();
+  });
+});
+
+describe('FileImportFlow — refusing a damaged WAV (#147)', () => {
+  const REFUSAL = '"track.wav" looks incomplete or damaged and was not imported.';
+  const damaged = { ok: false, error: "Truncated WAV: 'data' chunk declares 176400 bytes" };
+
+  it('on Upload: refused there, nothing else changes', async () => {
+    const deps = makeFlow();
+    deps.api.checkWavFile.mockResolvedValueOnce(damaged);
+
+    await deps.flow.importFile(DAMAGED, 'Dropped');
+
+    expect(deps.api.checkWavFile).toHaveBeenCalledWith(DAMAGED);
+    expect(deps.uploadView.showError).toHaveBeenCalledWith(REFUSAL);
+    expect(deps.logger.setStatus).toHaveBeenCalledWith(REFUSAL, true);
+    expect(deps.tags.pauseAndFlush).not.toHaveBeenCalled();
+    expect(deps.discardProcessedFile).not.toHaveBeenCalled();
+    expect(deps.screens.showAnalyze).not.toHaveBeenCalled();
+    expect(deps.api.readFileMetadata).not.toHaveBeenCalled();
+    expect(deps.state.currentFilePath).toBeNull();
+  });
+
+  it('on Analyze: refused there, keeping the shown file', async () => {
+    const deps = makeFlow();
+    await deps.flow.importFile(SONG, 'Dropped');
+    await settle();
+    vi.clearAllMocks();
+    deps.api.checkWavFile.mockResolvedValueOnce(damaged);
+
+    await deps.flow.importFile(DAMAGED, 'Selected');
+
+    expect(deps.analyzeView.showError).toHaveBeenCalledWith(REFUSAL);
+    expect(deps.uploadView.showError).not.toHaveBeenCalled();
+    expect(deps.discardProcessedFile).not.toHaveBeenCalled();
+    expect(deps.state.currentFilePath).toBe(SONG);
+  });
+
+  it('imports anyway when the check itself fails (the core still guards Process)', async () => {
+    const deps = makeFlow();
+    deps.api.checkWavFile.mockRejectedValueOnce(new Error('ipc down'));
+
+    await deps.flow.importFile(SONG, 'Dropped');
+
+    expect(deps.logger.error).toHaveBeenCalled();
+    expect(deps.state.currentFilePath).toBe(SONG);
+    expect(deps.screens.showAnalyze).toHaveBeenCalled();
   });
 });

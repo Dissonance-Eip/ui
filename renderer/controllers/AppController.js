@@ -18,6 +18,7 @@ import { FileImportFlow } from './FileImportFlow.js';
 import { ProcessingFlow } from './ProcessingFlow.js';
 import { ScreenNavigator } from './ScreenNavigator.js';
 import { TagEditSession } from './TagEditSession.js';
+import { ENGINE_UNAVAILABLE_MESSAGE, isEngineUnavailable } from '../utils/engineStatus.js';
 
 export class AppController extends BaseController {
   /**
@@ -53,6 +54,7 @@ export class AppController extends BaseController {
       tags: this.tags,
       screens: this.screens,
       discardProcessedFile: () => this.processing.discardProcessedFile(),
+      onEngineUnavailable: () => this.reportEngineUnavailable(),
     });
   }
 
@@ -66,6 +68,7 @@ export class AppController extends BaseController {
     this._wireAppEvents();
     this.screens.syncButtons();
     this.logger?.setStatus?.('Ready');
+    this._checkEngine().catch((err) => this.logger?.error?.(`Engine status check failed: ${err}`));
   }
 
   _mountViews() {
@@ -121,6 +124,19 @@ export class AppController extends BaseController {
         this.logger?.log?.(`core:status — ${msg}`);
       })
     );
+  }
+
+  /** Ask main once whether the native engine loaded; say so if it did not. */
+  async _checkEngine() {
+    if (isEngineUnavailable(await this.api.getEngineStatus())) this.reportEngineUnavailable();
+  }
+
+  /** Persistent alert on Upload, and Process stays disabled for the session. */
+  reportEngineUnavailable() {
+    this.state.setEngineUnavailable();
+    this.uploadView.showEngineError(ENGINE_UNAVAILABLE_MESSAGE);
+    this.screens.syncButtons();
+    this.logger?.setStatus?.(ENGINE_UNAVAILABLE_MESSAGE, true);
   }
 
   importFile(filePath, sourceLabel) {

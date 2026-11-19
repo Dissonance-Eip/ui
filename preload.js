@@ -87,9 +87,11 @@ contextBridge.exposeInMainWorld('dissonance', {
     }
   },
   readFileMetadata: (filePath) => ipcRenderer.invoke('core:readMetadata', filePath),
+  checkWavFile: (filePath) => ipcRenderer.invoke('file:checkWav', filePath),
   processFile: (filePath, options) => ipcRenderer.invoke('core:process', { filePath, options }),
   writeTags: (filePath, tags) => ipcRenderer.invoke('core:writeTags', { filePath, tags }),
   exportFile: (processedPath) => ipcRenderer.invoke('core:export', processedPath),
+  getEngineStatus: () => ipcRenderer.invoke('core:engineStatus'),
   cleanupProcessedFile: (processedPath) =>
     ipcRenderer.invoke('core:cleanupProcessed', processedPath),
   onAppFlushRequest: (cb) => answerRequests('app:flushRequest', 'app:flushDone', () => cb()),

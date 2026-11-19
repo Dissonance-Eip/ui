@@ -162,6 +162,7 @@ The main side takes every name from `ipcHandlers/ipcChannels.js`. The sandboxed 
 | Channel                                | Purpose                                                      |
 | -------------------------------------- | ------------------------------------------------------------ |
 | `dialog:openFile`                      | Native file picker (audio formats)                           |
+| `file:checkWav`                        | Refuse a truncated or non-RIFF WAV before import             |
 | `core:process`                         | Run the full audio pipeline on a WAV                         |
 | `core:readMetadata`                    | Read header + LIST/INFO tags without decoding audio          |
 | `core:writeTags`                       | Rewrite the LIST/INFO chunk in place                         |

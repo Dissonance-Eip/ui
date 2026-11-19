@@ -13,11 +13,14 @@ function registerWithDoubles() {
 }
 
 describe('registerFileHandlers', () => {
-  it('serves renderer log forwarding and the file dialog on the given ipc', () => {
+  it('serves renderer log forwarding, the file dialog and the WAV check on the given ipc', () => {
     const { ipc } = registerWithDoubles();
 
     expect(ipc.listenerCount(IpcChannels.UI_LOG)).toBe(1);
-    expect([...ipc.handlers.keys()]).toEqual([IpcChannels.DIALOG_OPEN_FILE]);
+    expect([...ipc.handlers.keys()]).toEqual([
+      IpcChannels.DIALOG_OPEN_FILE,
+      IpcChannels.FILE_CHECK_WAV,
+    ]);
   });
 
   it('opens the file dialog through the given dialog', async () => {

@@ -23,6 +23,10 @@ export class DissonanceApi extends BaseApi {
     return this._call('readFileMetadata', filePath);
   }
 
+  async checkWavFile(filePath) {
+    return this._call('checkWavFile', filePath);
+  }
+
   async cleanupProcessedFile(processedPath) {
     return this._call('cleanupProcessedFile', processedPath);
   }
@@ -37,6 +41,11 @@ export class DissonanceApi extends BaseApi {
 
   async exportFile(processedPath) {
     return this._call('exportFile', processedPath);
+  }
+
+  /** `{ ok: true }`, or `{ ok: false, code: 'ENGINE_UNAVAILABLE', reason }`. */
+  async getEngineStatus() {
+    return this._call('getEngineStatus');
   }
 
   onCoreStatus(cb) {
