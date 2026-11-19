@@ -12,6 +12,7 @@
  * file's tags (#111).
  */
 import { promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
+import { userErrorReason } from '../utils/errorMessage.js';
 
 export class FileImportFlow {
   /**
@@ -91,10 +92,16 @@ export class FileImportFlow {
       }
       const errMsg = resp && resp.error ? resp.error : 'Unknown error';
       this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
+      this._showReadError(errMsg);
     } catch (err) {
       if (!this._isCurrentRead(readId, filePath)) return;
       this.logger?.error?.(`Metadata failed: ${err}`);
+      this._showReadError(err);
     }
+  }
+
+  _showReadError(error) {
+    this.analyzeView.showError(`Could not read this file: ${userErrorReason(error)}`);
   }
 
   _showReadMetadata(filePath, resp) {

@@ -7,6 +7,7 @@
  *     copyright, software) — TAG_FIELDS is the single source of truth;
  *     the inputs are found by their `data-tag` attribute
  *   • the Process button
+ *   • an error alert (showError / clearError) for a failed read or run
  *
  * Pure presentational concerns only — the queue/write logic lives in
  * AppController via onTagBlur + onPlaybackStateChange callbacks.
@@ -43,6 +44,7 @@ export class AnalyzeView extends BaseComponent {
     processingModeEls,
     processingModeLabelEl,
     processBtn,
+    errorEl,
   }) {
     super();
     this.selectedFileEl = selectedFileEl;
@@ -53,6 +55,7 @@ export class AnalyzeView extends BaseComponent {
     this.processingModeEls = Array.from(processingModeEls || []);
     this.processingModeLabelEl = processingModeLabelEl;
     this.processBtn = processBtn;
+    this.errorEl = errorEl;
     this._processEnabled = false;
 
     this._tagEls = tagInputsByField(tagInputEls);
@@ -102,6 +105,8 @@ export class AnalyzeView extends BaseComponent {
   // ---------------------------------------------------------------------------
 
   setSelectedFile(filePath) {
+    // An error belongs to the file it was raised for.
+    this.clearError();
     if (!this.selectedFileEl) return;
     // Show only the filename; hover (`title` attr) reveals the full path.
     this.selectedFileEl.textContent = filePath ? basename(filePath) : 'No file selected';
@@ -127,6 +132,26 @@ export class AnalyzeView extends BaseComponent {
 
     const tags = basicInfo && basicInfo.tags;
     if (tags) this.setMetadataTags(tags);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Error alert
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Show `message` in the Analyze screen's alert (role="alert", so screen
+   * readers announce it). Pass text already fit for the user.
+   */
+  showError(message) {
+    if (!this.errorEl) return;
+    this.errorEl.textContent = message;
+    this.errorEl.hidden = false;
+  }
+
+  clearError() {
+    if (!this.errorEl) return;
+    this.errorEl.textContent = '';
+    this.errorEl.hidden = true;
   }
 
   // ---------------------------------------------------------------------------
