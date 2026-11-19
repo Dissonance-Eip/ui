@@ -52,29 +52,31 @@ jobs:
           mkdir -p /tmp/core_release
 
           # No tag = the latest release, which skips pre-releases such as vX.Y.Z-rc.N.
-          gh release download ${CORE_TAG:+"$CORE_TAG"} --repo Dissonance-Eip/core --pattern "*.node" --dir /tmp/core_release
+          tag=${CORE_TAG:-$(gh release view --repo Dissonance-Eip/core --json tagName --jq .tagName)}
+          gh release download "$tag" --repo Dissonance-Eip/core --pattern "*.node" --dir /tmp/core_release
 
           ls -lah /tmp/core_release
           if ! compgen -G "/tmp/core_release/*.node" > /dev/null; then
             echo "::error::No .node assets found in the core release."
             exit 1
           fi
+          # Records which core release the binaries come from.
+          echo "$tag" > /tmp/core_release/CORE_VERSION
 
       - name: Copy assets into Build/Release
         run: |
-          cp -f /tmp/core_release/*.node Build/Release/
+          cp -f /tmp/core_release/*.node /tmp/core_release/CORE_VERSION Build/Release/
           ls -lah Build/Release
 
       - name: Open or update the sync pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: chore/sync-core-addon
-          CORE_TAG: ${{ inputs.core_tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add Build/Release/*.node
+          git add Build/Release/*.node Build/Release/CORE_VERSION
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
@@ -93,7 +95,7 @@ jobs:
           git commit -m "chore(ui): sync core addon binaries"
           git push --force origin "HEAD:$BRANCH"
 
-          body="Automated sync of the core addon binaries (Build/Release/*.node) from core release ${CORE_TAG:-latest}.
+          body="Automated sync of the core addon binaries (Build/Release/*.node) from core release $(cat Build/Release/CORE_VERSION).
 
           This pull request was opened with GITHUB_TOKEN, so it does not trigger the required \"Lint, Format, Test, Build\" check. Close and reopen it to run the checks before merging."
 
