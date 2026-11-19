@@ -20,7 +20,13 @@ const LOGGER_FILES = ['main/logger.js', 'renderer/infrastructure/TerminalLogger.
 
 module.exports = [
   {
-    ignores: ['build/**', 'node_modules/**', 'coverage/**'],
+    ignores: [
+      'build/**',
+      'node_modules/**',
+      'coverage/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   js.configs.recommended,
   {
@@ -61,5 +67,10 @@ module.exports = [
       },
     },
     rules: strictRules,
+  },
+  {
+    // E2E callbacks passed to page.evaluate() run in the app window.
+    files: ['tests/e2e/**/*.js'],
+    languageOptions: { globals: { ...globals.browser } },
   },
 ];

@@ -42,7 +42,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The rest of this README is for developer
 - **JavaScript only**, no bundler — `index.html` loads plain ES modules
 - **Tailwind CSS** compiled locally via Tailwind CLI
 - **electron-builder** for packaging
-- **vitest** for unit tests
+- **vitest** for unit tests, **Playwright** for end-to-end tests of the running app
 - **C++ core** loaded at runtime as a `.node` native addon
 
 ---
@@ -99,6 +99,20 @@ Prints a per-file coverage table and writes a report to `coverage/` (git-ignored
 ### Addon integration test
 
 `tests/coreAddon.integration.test.js` runs the real core addon from `Build/Release/` through the same `CoreAddonLoader` the app uses. It generates its own WAV fixtures, so no audio is committed. It checks that a processed file is a valid WAV with the same duration, sample rate and channels, and covers Beta 1 regressions (non-WAV input, truncated WAV, 0% strength). The 0% strength tests are marked `it.fails` until the addon is fixed (ui#83). On a platform with no matching addon binary the test is skipped with a warning.
+
+### End-to-end tests
+
+```bash
+npm run test:e2e       # compiles Tailwind, then playwright test
+npx playwright test tests/e2e/errors.spec.js   # one file
+npx playwright show-report                     # after a CI-style run (CI=1)
+```
+
+`tests/e2e/` drives the real Electron app with Playwright's `_electron` launcher, on the real core addon from `Build/Release/`. Each test launches its own app with its own userData dir (so the single-instance lock never hands the launch to another running Dissonance) and its own `TMPDIR` (so processed temp files can be counted). Native open and save dialogs are stubbed in the main process; a drag and drop is simulated with a real, disk-backed file. WAV fixtures are generated at test time by `tests/e2e/helpers/wav.js`, so no audio is committed. Test titles name the acceptance test plan rows they cover (F2, F4, ...).
+
+The suite covers the happy path (import, tags, process, compare, export, restart, quit) and the failure paths (truncated, zero-length, non-RIFF and non-WAV files, cancelled dialogs). Tests marked `test.fail` assert the fixed behaviour of an open pull request named in the test; remove `test.fail` once that pull request is merged.
+
+On Linux, run under a display server: CI uses `xvfb-run -a npm run test:e2e` in the `E2E` job of the UI quality workflow, and uploads the Playwright report and traces when it fails. The suite is not part of `npm test` or of the coverage total.
 
 ---
 
