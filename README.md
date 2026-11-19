@@ -18,10 +18,7 @@ Download the latest version from the [releases page](https://github.com/Dissonan
 | Windows (x64)         | `Dissonance.Setup.<version>.exe` |
 | Linux (x64)           | `Dissonance-<version>.AppImage`  |
 
-The builds are not signed yet, so your system warns you the first time you open the app:
-
-- **macOS:** right-click the app, then **Open**
-- **Windows:** click **More info**, then **Run anyway**
+The macOS build is signed and notarized by Apple. The Windows build is not signed yet, so Windows warns you the first time you open the app: click **More info**, then **Run anyway**.
 
 There is no build for Intel Macs yet.
 
@@ -199,7 +196,7 @@ One-time setup by a repository admin:
 
 `npm run dist` builds the installers for your platform (`.dmg` and `.zip` on macOS, an NSIS `.exe` on Windows, an `.AppImage` on Linux) into `dist/`.
 
-Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag builds all three platforms and publishes them as a GitHub release. A release candidate tag (`vX.Y.Z-rc.N`) is published as a pre-release.
+Releases are built by `.github/workflows/release-app.yml`: pushing a `v*` tag builds all three platforms and publishes them as a GitHub release. A release candidate tag (`vX.Y.Z-rc.N`) is published as a pre-release. The macOS build is signed and notarized in CI; see [Signing and notarizing macOS releases](CONTRIBUTING.md#signing-and-notarizing-macos-releases).
 
 ---
 

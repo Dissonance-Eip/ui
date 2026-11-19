@@ -63,7 +63,68 @@ jobs:
           fi
 
       - name: Build distributables
+        if: matrix.os != 'macos'
         run: npm run dist
+
+      # Signs with the Developer ID certificate and notarizes with an App Store
+      # Connect API key. See "Signing and notarizing macOS releases" in
+      # CONTRIBUTING.md for the secrets.
+      - name: Build, sign and notarize distributables (macOS)
+        id: mac_build
+        if: matrix.os == 'macos'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          missing=()
+          [ -n "$CSC_LINK" ] || missing+=(CSC_LINK)
+          [ -n "$CSC_KEY_PASSWORD" ] || missing+=(CSC_KEY_PASSWORD)
+          [ -n "$APPLE_API_KEY_P8" ] || missing+=(APPLE_API_KEY)
+          [ -n "$APPLE_API_KEY_ID" ] || missing+=(APPLE_API_KEY_ID)
+          [ -n "$APPLE_API_ISSUER" ] || missing+=(APPLE_API_ISSUER)
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            if [ "$IS_TAG" = true ]; then
+              echo "::error::Missing macOS signing secret(s): ${missing[*]}. A tag build must be signed and notarized: add them in Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+            echo "::warning::Missing macOS signing secret(s): ${missing[*]}. Building an unsigned (ad-hoc) app."
+            # electron-builder treats an empty variable as set, so drop them all.
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_P8 APPLE_API_KEY_ID APPLE_API_ISSUER
+          else
+            # electron-builder wants APPLE_API_KEY to be the path of the .p8 file.
+            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
+            printf '%s\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY"
+            unset APPLE_API_KEY_P8
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          npm run dist
+
+      # The app is what gets notarized and stapled; the dmg and zip wrap it.
+      # spctl uses -t exec because -t install is for .pkg installers. If the
+      # runner has Gatekeeper assessments disabled, spctl accepts anything
+      # with an "override" source; stapler validate still proves notarization.
+      - name: Verify macOS signature and notarization
+        if: steps.mac_build.outputs.signed == 'true'
+        run: |
+          app="dist/mac-arm64/Dissonance.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          assessment=$(spctl -a -vvv -t exec "$app" 2>&1) || { echo "$assessment"; exit 1; }
+          echo "$assessment"
+          if ! grep -q "source=Notarized Developer ID" <<< "$assessment"; then
+            if grep -q "override" <<< "$assessment"; then
+              echo "::warning::Gatekeeper assessments are disabled on this runner; relying on stapler validate."
+            else
+              echo "::error::Gatekeeper does not see the app as notarized."
+              exit 1
+            fi
+          fi
+          xcrun stapler validate "$app"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -103,7 +164,7 @@ jobs:
             masking model.
 
             ## Notes
-            - Builds are unsigned/unnotarized — macOS Gatekeeper and Windows
-              SmartScreen will warn on first launch (macOS: right-click → Open;
-              Windows: More info → Run anyway).
+            - The macOS build is signed and notarized by Apple.
+            - The Windows and Linux builds are unsigned: Windows SmartScreen
+              warns on first launch (More info → Run anyway).
             - macOS is Apple Silicon only; no Intel build.

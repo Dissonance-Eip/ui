@@ -44,6 +44,12 @@
       "target": [
         "dmg",
         "zip"
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "asarUnpack": [
+        "Build/Release/*-darwin-*.node"
       ]
     },
     "win": {
