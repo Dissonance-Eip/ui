@@ -52,3 +52,36 @@ describe('UploadView', () => {
     expect(el.listenerCount('drop')).toBe(0);
   });
 });
+
+describe('UploadView error message', () => {
+  const makeView = () => {
+    const errorEl = { textContent: '', hidden: true };
+    return { view: new UploadView({ errorEl }), errorEl };
+  };
+
+  it('shows the message in the alert', () => {
+    const { view, errorEl } = makeView();
+
+    view.showError('Only WAV files are supported.');
+
+    expect(errorEl.textContent).toBe('Only WAV files are supported.');
+    expect(errorEl.hidden).toBe(false);
+  });
+
+  it('hides and empties the alert on clearError', () => {
+    const { view, errorEl } = makeView();
+    view.showError('boom');
+
+    view.clearError();
+
+    expect(errorEl.textContent).toBe('');
+    expect(errorEl.hidden).toBe(true);
+  });
+
+  it('does nothing without an error element', () => {
+    const view = new UploadView({});
+
+    expect(() => view.showError('boom')).not.toThrow();
+    expect(() => view.clearError()).not.toThrow();
+  });
+});

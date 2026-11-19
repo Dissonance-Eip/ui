@@ -13,6 +13,7 @@ import {
   makeLogger,
   makeScreens,
   makeTagSession,
+  makeUploadView,
 } from './helpers/fakeRenderer.js';
 
 const SONG = '/music/song.wav';
@@ -31,7 +32,7 @@ function makeFlow() {
     tags: makeTagSession(),
     screens: makeScreens(),
     discardProcessedFile: vi.fn(),
-    alertMessage: { show: vi.fn(), clear: vi.fn() },
+    uploadView: makeUploadView(),
   };
   return { flow: new FileImportFlow(deps), ...deps };
 }
@@ -96,39 +97,40 @@ describe('FileImportFlow.importFile', () => {
 describe('FileImportFlow — refusing a file that is not a WAV', () => {
   const REFUSAL = 'Only WAV files are supported. "track.mp3" was not imported.';
 
-  function expectRefused({ api, tags, discardProcessedFile, screens, logger, alertMessage }) {
-    expect(alertMessage.show).toHaveBeenCalledWith(REFUSAL);
-    expect(logger.setStatus).toHaveBeenCalledWith(REFUSAL, true);
-    expect(tags.pauseAndFlush).not.toHaveBeenCalled();
-    expect(discardProcessedFile).not.toHaveBeenCalled();
-    expect(screens.showAnalyze).not.toHaveBeenCalled();
-    expect(api.readFileMetadata).not.toHaveBeenCalled();
+  /** Imports SONG, then forgets the calls it made, so only the refusal's show. */
+  async function onAnalyzeWithSong() {
+    const deps = makeFlow();
+    await deps.flow.importFile(SONG, 'Dropped');
+    await settle();
+    vi.clearAllMocks();
+    return deps;
   }
 
-  it('importFile refuses it and touches nothing', async () => {
+  function expectRefused(deps, shownOn, notOn) {
+    expect(shownOn.showError).toHaveBeenCalledWith(REFUSAL);
+    expect(notOn.showError).not.toHaveBeenCalled();
+    expect(deps.logger.setStatus).toHaveBeenCalledWith(REFUSAL, true);
+    expect(deps.tags.pauseAndFlush).not.toHaveBeenCalled();
+    expect(deps.discardProcessedFile).not.toHaveBeenCalled();
+    expect(deps.screens.showAnalyze).not.toHaveBeenCalled();
+    expect(deps.api.readFileMetadata).not.toHaveBeenCalled();
+  }
+
+  it('on Upload: refused there, nothing else changes', async () => {
     const deps = makeFlow();
 
     await deps.flow.importFile(MP3, 'Dropped');
 
-    expectRefused(deps);
+    expectRefused(deps, deps.uploadView, deps.analyzeView);
     expect(deps.state.currentFilePath).toBeNull();
   });
 
-  it('keeps the shown file, its output and its tag edits on Analyze', async () => {
-    const deps = makeFlow();
-    await deps.flow.importFile(SONG, 'Dropped');
-    await settle();
-    for (const spy of [
-      deps.tags.pauseAndFlush,
-      deps.discardProcessedFile,
-      deps.screens.showAnalyze,
-    ])
-      spy.mockClear();
-    deps.api.readFileMetadata.mockClear();
+  it('on Analyze: refused there, keeping the shown file, its output and its tag edits', async () => {
+    const deps = await onAnalyzeWithSong();
 
     await deps.flow.importFile(MP3, 'Selected');
 
-    expectRefused(deps);
+    expectRefused(deps, deps.analyzeView, deps.uploadView);
     expect(deps.state.currentFilePath).toBe(SONG);
   });
 
@@ -139,34 +141,26 @@ describe('FileImportFlow — refusing a file that is not a WAV', () => {
     deps.flow.handleWindowDrop(makeDragEvent([{ name: 'track.mp3' }]));
     await settle();
 
-    expectRefused(deps);
+    expectRefused(deps, deps.uploadView, deps.analyzeView);
   });
 
-  it('"Change file" picking an MP3 is refused', async () => {
-    const deps = makeFlow();
+  it('"Change file" picking an MP3 is refused on Analyze', async () => {
+    const deps = await onAnalyzeWithSong();
     deps.api.openFile.mockResolvedValueOnce(MP3);
 
     await deps.flow.changeFile();
     await settle();
 
-    expectRefused(deps);
+    expectRefused(deps, deps.analyzeView, deps.uploadView);
   });
 
-  it('a WAV imported next clears the message', async () => {
-    const { flow, alertMessage } = makeFlow();
+  it('a WAV imported next clears the Upload message', async () => {
+    const { flow, uploadView } = makeFlow();
     await flow.importFile(MP3, 'Dropped');
 
     await flow.importFile(SONG, 'Dropped');
 
-    expect(alertMessage.clear).toHaveBeenCalled();
-  });
-
-  it('works without an alert message', async () => {
-    const deps = makeFlow();
-    const bare = new FileImportFlow({ ...deps, alertMessage: undefined });
-
-    await expect(bare.importFile(MP3, 'Dropped')).resolves.toBeUndefined();
-    expect(deps.logger.setStatus).toHaveBeenCalledWith(REFUSAL, true);
+    expect(uploadView.clearError).toHaveBeenCalled();
   });
 });
 
@@ -218,10 +212,10 @@ describe('FileImportFlow — other entry points', () => {
   });
 
   it('clear() hides the refusal message', () => {
-    const { flow, alertMessage } = makeFlow();
+    const { flow, uploadView } = makeFlow();
 
     flow.clear();
 
-    expect(alertMessage.clear).toHaveBeenCalled();
+    expect(uploadView.clearError).toHaveBeenCalled();
   });
 });

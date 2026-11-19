@@ -27,17 +27,16 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `ViewRouter.js` — show-one-hide-others switcher for the three top-level views.
 - `renderer/controllers/`
   - `AppController.js` — thin coordinator: builds the flows below and wires view, window and main-process events (quit flush, multi-window pause/refresh, core status) to them.
-  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard. Refuses a non-WAV with an on-screen message before anything changes (ui#82).
+  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard. Refuses a non-WAV before anything changes, with a message on Upload, or on Analyze when a file is shown (ui#82).
   - `ProcessingFlow.js` — process → Compare, export, restart; the operation id that discards a result arriving after a restart.
   - `TagEditSession.js` — the TagWriteQueue, playback↔queue coordination, what a form snapshot may write (#111), and the pause-and-flush chokepoint.
   - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.
 - `renderer/views/`
-  - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
-  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button. Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
+  - `UploadView.js` — drop zone host (delegates to the `DropZone` component) + an error alert (`showError` / `clearError`, `role="alert"`) for a refused file.
+  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button + an error alert (`showError` / `clearError`, `role="alert"`; cleared when another file is shown). Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
   - `renderWavInfo.js` — writes a WAV info panel (filename, duration, sample rate, channels); shared by AnalyzeView and CompareView.
 - `renderer/components/`
-  - `AlertMessage.js` — the app-wide `role="alert"` message (`#appAlert`) above every screen: `show(text)` / `clear()`. Passed to the flows as `alertMessage`.
   - `DropZone.js` — drag/drop + click-to-open file picker. Falls back to the native dialog when a dropped file has no resolvable path.
   - `WaveformPreview.js` — reusable waveform player wrapper. Owns create/loadTrack/destroy, in-place theme repaint (keeps the player and its audio, so playback continues), drag-to-scrub, audio event forwarding. Used by AnalyzeView (1×) and CompareView (2×).
 - `renderer/services/`

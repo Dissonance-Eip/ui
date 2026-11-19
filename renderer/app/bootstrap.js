@@ -25,7 +25,6 @@ import { AnalyzeView } from '../views/AnalyzeView.js';
 import { CompareView } from '../views/CompareView.js';
 import { AppController } from '../controllers/AppController.js';
 import { WavMetadataService } from '../services/WavMetadataService.js';
-import { AlertMessage } from '../components/AlertMessage.js';
 import { exposeDebugGlobals } from './debugGlobals.js';
 
 /**
@@ -87,6 +86,7 @@ export function bootstrap() {
 
   const uploadView = new UploadView({
     dropZoneEl: document.getElementById('dropZone'),
+    errorEl: document.getElementById('uploadError'),
     api,
     logger,
     getLastFilePath: () => state.lastImportedFilePath,
@@ -103,6 +103,7 @@ export function bootstrap() {
     processingModeEls: document.querySelectorAll('[data-processing-mode]'),
     processingModeLabelEl: document.getElementById('processingModesLabel'),
     processBtn: document.getElementById('processBtn'),
+    errorEl: document.getElementById('analyzeError'),
   });
 
   const compareView = new CompareView({
@@ -123,7 +124,6 @@ export function bootstrap() {
 
   const controller = new AppController({
     api,
-    alertMessage: new AlertMessage(document.getElementById('appAlert')),
     logger,
     router,
     state,

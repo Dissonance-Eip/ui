@@ -71,6 +71,8 @@ export function makeAnalyzeView({ modes = ['white_noise'] } = {}) {
     clearAudioPreview: vi.fn(),
     pauseAudioPreview: vi.fn(),
     setProcessEnabled: vi.fn(),
+    showError: vi.fn(),
+    clearError: vi.fn(),
   };
 }
 
@@ -94,7 +96,14 @@ export function makeCompareView() {
 
 export function makeUploadView() {
   const { callbacks, registrars } = makeCallbackSlots(['onFileImported']);
-  return { callbacks, ...registrars, mount: vi.fn(), unmount: vi.fn() };
+  return {
+    callbacks,
+    ...registrars,
+    mount: vi.fn(),
+    unmount: vi.fn(),
+    showError: vi.fn(),
+    clearError: vi.fn(),
+  };
 }
 
 const SUBSCRIPTIONS = [

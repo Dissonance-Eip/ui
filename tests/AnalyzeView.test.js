@@ -11,6 +11,7 @@ function makeView({ tagNames = TAG_NAMES } = {}) {
     metaDurationEl: new FakeElement(),
     metaSampleRateEl: new FakeElement(),
     metaChannelsEl: new FakeElement(),
+    errorEl: Object.assign(new FakeElement({ role: 'alert' }), { hidden: true }),
   };
   const tagInputs = Object.fromEntries(
     tagNames.map((name) => [name, new FakeElement({ 'data-tag': name })])
@@ -84,6 +85,44 @@ describe('AnalyzeView.setSelectedFile', () => {
 
     expect(els.selectedFileEl.textContent).toBe('No file selected');
     expect(els.selectedFileEl.title).toBe('');
+  });
+});
+
+describe('AnalyzeView error message', () => {
+  it('shows the message in the alert', () => {
+    const { view, els } = makeView();
+
+    view.showError('Could not process this file: Failed to read audio data');
+
+    expect(els.errorEl.hidden).toBe(false);
+    expect(els.errorEl.textContent).toBe('Could not process this file: Failed to read audio data');
+    expect(els.errorEl.getAttribute('role')).toBe('alert');
+  });
+
+  it('hides and empties the alert on clearError', () => {
+    const { view, els } = makeView();
+    view.showError('boom');
+
+    view.clearError();
+
+    expect(els.errorEl.hidden).toBe(true);
+    expect(els.errorEl.textContent).toBe('');
+  });
+
+  it('clears the error when another file is shown', () => {
+    const { view, els } = makeView();
+    view.showError('boom');
+
+    view.setSelectedFile('/music/other.wav');
+
+    expect(els.errorEl.hidden).toBe(true);
+  });
+
+  it('does nothing without an error element', () => {
+    const view = new AnalyzeView({});
+
+    expect(() => view.showError('boom')).not.toThrow();
+    expect(() => view.clearError()).not.toThrow();
   });
 });
 

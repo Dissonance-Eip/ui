@@ -19,10 +19,9 @@ export class FileImportFlow {
   /**
    * @param {{ api: object, logger?: object, state: object, analyzeView: object,
    *   compareView: object, wavMetadataService: object, tags: object,
-   *   screens: object, discardProcessedFile: () => void, alertMessage?: object }} deps
+   *   uploadView: object, screens: object, discardProcessedFile: () => void }} deps
    *   tags — the TagEditSession; screens — the ScreenNavigator;
-   *   discardProcessedFile — drops the previous processed temp file;
-   *   alertMessage — the on-screen AlertMessage a refused file is reported in.
+   *   discardProcessedFile — drops the previous processed temp file.
    */
   constructor(deps) {
     this.api = deps.api;
@@ -34,7 +33,7 @@ export class FileImportFlow {
     this.tags = deps.tags;
     this.screens = deps.screens;
     this.discardProcessedFile = deps.discardProcessedFile;
-    this.alertMessage = deps.alertMessage;
+    this.uploadView = deps.uploadView;
 
     // Basic info of the shown source file; Compare shows it next to the output.
     this.originalInfo = null;
@@ -53,7 +52,7 @@ export class FileImportFlow {
       this._refuseFile(filePath);
       return;
     }
-    this.alertMessage?.clear();
+    this.uploadView.clearError();
 
     // Capture any tag edits for the OLD file and flush them safely before we
     // touch anything. Also waits for in-flight writes so the read below
@@ -72,11 +71,15 @@ export class FileImportFlow {
     this.readFileMetadata(filePath);
   }
 
-  /** Say why `filePath` was not imported; the shown file, if any, stays. */
+  /**
+   * Say why `filePath` was not imported: on Analyze when a file is shown
+   * (it stays), on Upload otherwise.
+   */
   _refuseFile(filePath) {
     const message = `Only WAV files are supported. "${basename(filePath)}" was not imported.`;
     this.logger?.setStatus?.(message, true);
-    this.alertMessage?.show(message);
+    const view = this.state.currentFilePath ? this.analyzeView : this.uploadView;
+    view.showError(message);
   }
 
   /** Show `filePath` with placeholder info until its metadata arrives. */
@@ -138,7 +141,7 @@ export class FileImportFlow {
   /** Forget the shown file's info and any refusal message (back to Upload). */
   clear() {
     this.originalInfo = null;
-    this.alertMessage?.clear();
+    this.uploadView.clearError();
   }
 
   /** Window-level dragover: allow the drop and show the copy cursor. */

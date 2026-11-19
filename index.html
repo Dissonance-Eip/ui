@@ -54,12 +54,6 @@
         </p>
       </header>
       <main class="flex-1 flex flex-col gap-3 px-6 pb-6 box-border">
-        <p
-          id="appAlert"
-          role="alert"
-          class="mx-auto w-full max-w-2xl rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-center text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
-          hidden
-        ></p>
         <section id="view-upload">
           <div id="welcome" class="flex-1 flex flex-col items-center justify-center gap-4 py-4">
             <div
@@ -112,6 +106,12 @@
                 <span class="font-semibold text-blue-800 dark:text-blue-300">choose file</span>
               </div>
             </div>
+            <div
+              id="uploadError"
+              role="alert"
+              class="w-[min(420px,90vw)] rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-center text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+              hidden
+            ></div>
           </div>
         </section>
 
@@ -120,6 +120,13 @@
             <h2 class="m-0 text-center text-base font-semibold text-slate-800 dark:text-slate-100">
               Analyze
             </h2>
+
+            <div
+              id="analyzeError"
+              role="alert"
+              class="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+              hidden
+            ></div>
 
             <!-- FULL WIDTH: file chip -->
             <div

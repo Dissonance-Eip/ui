@@ -76,7 +76,7 @@ describe('bootstrap', () => {
     doc.elements.get('dropZone').fire('drop', makeDragEvent([{ name: 'track.mp3' }]));
     await settle();
 
-    const alert = doc.elements.get('appAlert');
+    const alert = doc.elements.get('uploadError');
     expect(alert.textContent).toContain('Only WAV files are supported');
     expect(alert.hidden).toBe(false);
     expect(doc.elements.get('view-upload').hidden).toBe(false);
