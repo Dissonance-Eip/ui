@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Build the macOS app icon: the artwork inside Apple's 824 px rounded square,
 centred on a transparent 1024 px canvas with a subtle drop shadow.
+Writes <out>.png (Dock icon in dev) and <out>.icns (packaged app).
 
 Usage: python3 scripts/make-mac-icon.py <source-image> [out.png]
 
 resources/icon-mac.png was made from the 2048 px master in the docs repo:
   python3 scripts/make-mac-icon.py ../docs/assets/images/Dissonance_Logo.psd
-Needs only macOS `sips` (decode + resize) and the Python standard library.
+Needs only macOS `sips`, `iconutil` and the Python standard library.
+The .icns is made with iconutil because the one electron-builder generates
+from a PNG renders scrambled at 16 and 32 px in Finder.
 """
 import math
 import os
@@ -24,6 +27,7 @@ SHADOW_OFFSET_Y = 10
 SHADOW_BLUR = 24
 SHADOW_ALPHA = 0.3
 BGRA_MASKS = (0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+ICONSET_SIZES = (16, 32, 128, 256, 512)
 
 
 def load_tile_bgra(src):
@@ -97,6 +101,18 @@ def write_png(path, rgba):
         f.write(chunk(b'IEND', b''))
 
 
+def write_icns(png_path, icns_path):
+    with tempfile.TemporaryDirectory() as tmp:
+        iconset = os.path.join(tmp, 'icon.iconset')
+        os.mkdir(iconset)
+        for size in ICONSET_SIZES:
+            for scale, suffix in ((1, ''), (2, '@2x')):
+                px = str(size * scale)
+                name = os.path.join(iconset, f'icon_{size}x{size}{suffix}.png')
+                subprocess.run(['sips', '-z', px, px, png_path, '--out', name], check=True, capture_output=True)
+        subprocess.run(['iconutil', '-c', 'icns', iconset, '-o', icns_path], check=True)
+
+
 def alpha_at(rgba, x, y):
     return rgba[(y * CANVAS + x) * 4 + 3]
 
@@ -111,7 +127,9 @@ def main():
     assert alpha_at(rgba, MARGIN + 2, MARGIN + 2) == 0
     assert alpha_at(rgba, CANVAS // 2, CANVAS // 2) == 255
     write_png(out_path, rgba)
-    print(f'Wrote {out_path}')
+    icns_path = os.path.splitext(out_path)[0] + '.icns'
+    write_icns(out_path, icns_path)
+    print(f'Wrote {out_path} and {icns_path}')
 
 
 if __name__ == '__main__':

@@ -40,7 +40,7 @@
       "buildResources": "resources"
     },
     "mac": {
-      "icon": "resources/icon-mac.png",
+      "icon": "resources/icon-mac.icns",
       "target": [
         "dmg",
         "zip"
