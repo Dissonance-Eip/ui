@@ -45,8 +45,9 @@ function processedPathOf(payload) {
 }
 
 /**
- * Strength 0 means "change nothing" (F27). The bundled core builds still run
- * their FFT/masking stages at 0, so the input is copied here instead. Streamed
+ * Strength 0 means "change nothing" (F27). Core v0.2.0-rc.1 and later pass the
+ * audio through unchanged at 0 (core#101); older cores ran their FFT/masking
+ * stages anyway, so the input is still copied here as a guard. Streamed
  * into a new file rather than fs.copyFile, which would carry over a read-only
  * mode and break the tag write that follows.
  */
