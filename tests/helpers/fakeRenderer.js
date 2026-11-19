@@ -71,6 +71,8 @@ export function makeAnalyzeView({ modes = ['white_noise'] } = {}) {
     clearAudioPreview: vi.fn(),
     pauseAudioPreview: vi.fn(),
     setProcessEnabled: vi.fn(),
+    showError: vi.fn(),
+    clearError: vi.fn(),
   };
 }
 
