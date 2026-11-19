@@ -19,11 +19,9 @@
  *   - F9:  a non-WAV file is rejected with a clear error.
  *   - F10: a truncated WAV is rejected with a clear error.
  *   - F27: a strength of 0 must leave the audio untouched. These cases call
- *     the bundled addon directly; it predates the core pass-through fix
- *     (core#101), so they use `it.fails`. The app itself no longer relies on
- *     it: the main process copies the input at strength 0 (ui#83). Once a core
- *     release with that fix is synced into Build/Release/, they will fail as
- *     "unexpectedly passing": remove `.fails` at that point.
+ *     the bundled addon directly, so they check the core pass-through (core#101,
+ *     shipped since core v0.2.0-rc.1). The app also copies the input in the main
+ *     process at strength 0 (ui#83), so it does not depend on this alone.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
@@ -271,7 +269,7 @@ describe.skipIf(!binaryExpected)('core addon integration (real addon)', () => {
     });
   });
 
-  describe('F27: 0% strength must not modify the audio (bundled addon, before core#101)', () => {
+  describe('F27: 0% strength must not modify the audio (core#101 pass-through)', () => {
     // Zero-strength option sets, including the empty options object older
     // app builds sent.
     const zeroStrengthCases = [
@@ -280,7 +278,7 @@ describe.skipIf(!binaryExpected)('core addon integration (real addon)', () => {
       ['empty options', {}],
     ];
 
-    it.fails.each(zeroStrengthCases)(
+    it.each(zeroStrengthCases)(
       'output is byte-identical to the input: %s',
       async (_label, options) => {
         const out = outPath(`zero-${Math.random().toString(36).slice(2)}.wav`);

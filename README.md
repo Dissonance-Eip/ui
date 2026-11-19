@@ -98,7 +98,7 @@ Prints a per-file coverage table and writes a report to `coverage/` (git-ignored
 
 ### Addon integration test
 
-`tests/coreAddon.integration.test.js` runs the real core addon from `Build/Release/` through the same `CoreAddonLoader` the app uses. It generates its own WAV fixtures, so no audio is committed. It checks that a processed file is a valid WAV with the same duration, sample rate and channels, and covers Beta 1 regressions (non-WAV input, truncated WAV, 0% strength). The 0% strength tests are marked `it.fails` until the addon is fixed (ui#83). On a platform with no matching addon binary the test is skipped with a warning.
+`tests/coreAddon.integration.test.js` runs the real core addon from `Build/Release/` through the same `CoreAddonLoader` the app uses. It generates its own WAV fixtures, so no audio is committed. It checks that a processed file is a valid WAV with the same duration, sample rate and channels, and covers Beta 1 regressions (non-WAV input, truncated WAV, 0% strength). The 0% strength tests expect byte-identical output from the addon (core#101, core v0.2.0-rc.1 and later). On a platform with no matching addon binary the test is skipped with a warning.
 
 ### End-to-end tests
 
