@@ -33,7 +33,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.
 - `renderer/views/`
   - `UploadView.js` — drop zone host (delegates to the `DropZone` component).
-  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button. Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
+  - `AnalyzeView.js` - file info + waveform + editable metadata + processing mode selection + process button + an error alert (`showError` / `clearError`, `role="alert"`; cleared when another file is shown). Tag inputs are found by their `data-tag` attribute, filtered through `TAG_FIELDS`.
   - `CompareView.js` — original vs processed waveforms + info panels + export button.
   - `renderWavInfo.js` — writes a WAV info panel (filename, duration, sample rate, channels); shared by AnalyzeView and CompareView.
 - `renderer/components/`
@@ -48,6 +48,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
 - `renderer/utils/`
   - `pathUtils.js` — `basename()` for absolute paths (POSIX + Windows).
   - `wavInfoFormatters.js` — display formatters for duration, sample rate, channels.
+  - `errorMessage.js` — `userErrorReason()`: the reason behind a failed reply or thrown error, without `Error:` / IPC prefixes or stack lines, fit to show the user.
 
 ## Conventions
 

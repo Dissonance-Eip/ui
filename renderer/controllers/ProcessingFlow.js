@@ -12,6 +12,7 @@
  * players inside it always initialize against a laid-out, visible container.
  */
 import { buildProcessingOptions } from '../utils/processingOptions.js';
+import { userErrorReason } from '../utils/errorMessage.js';
 
 const errorOf = (resp) => (resp && resp.error ? resp.error : 'Unknown error');
 
@@ -55,12 +56,13 @@ export class ProcessingFlow {
       return;
     }
     const operationId = ++this._activeOperationId;
+    this.analyzeView.clearError();
     try {
       await this._runCore(operationId, options);
     } catch (err) {
       if (operationId !== this._activeOperationId) return; // restarted mid-flight; ignore
       this.logger?.error?.(`Processing failed: ${err}`);
-      this.screens.showAnalyze();
+      this._showFailure(err);
     }
   }
 
@@ -87,7 +89,13 @@ export class ProcessingFlow {
     }
     const errMsg = errorOf(resp);
     this.logger?.setStatus?.(`Processing failed: ${errMsg}`, true);
+    this._showFailure(errMsg);
+  }
+
+  /** Back to Analyze, telling the user why, so they can retry or pick another file. */
+  _showFailure(error) {
     this.screens.showAnalyze();
+    this.analyzeView.showError(`Could not process this file: ${userErrorReason(error)}`);
   }
 
   /**
