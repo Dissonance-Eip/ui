@@ -14,6 +14,7 @@
  */
 import { isWavPath, promptForFile, resolveDroppedPath } from '../services/fileSelection.js';
 import { basename } from '../utils/pathUtils.js';
+import { ENGINE_UNAVAILABLE_MESSAGE, isEngineUnavailable } from '../utils/engineStatus.js';
 
 export class FileImportFlow {
   /**
@@ -34,6 +35,7 @@ export class FileImportFlow {
     this.screens = deps.screens;
     this.discardProcessedFile = deps.discardProcessedFile;
     this.uploadView = deps.uploadView;
+    this.onEngineUnavailable = deps.onEngineUnavailable;
 
     // Basic info of the shown source file; Compare shows it next to the output.
     this.originalInfo = null;
@@ -91,7 +93,7 @@ export class FileImportFlow {
     this.analyzeView.setSelectedFile(filePath);
     this.analyzeView.setBasicWavInfo(this.originalInfo);
     this.analyzeView.setAudioPreviewFile(filePath);
-    this.analyzeView.setProcessEnabled(true);
+    this.analyzeView.setProcessEnabled(this.state.canProcess());
   }
 
   /** Read `filePath`'s metadata into the form, unless another file is shown by then. */
@@ -111,6 +113,10 @@ export class FileImportFlow {
       }
       const errMsg = resp && resp.error ? resp.error : 'Unknown error';
       this.logger?.setStatus?.(`Metadata failed: ${errMsg}`, true);
+      if (isEngineUnavailable(resp)) {
+        this.analyzeView.showError(ENGINE_UNAVAILABLE_MESSAGE);
+        this.onEngineUnavailable?.();
+      }
     } catch (err) {
       if (!this._isCurrentRead(readId, filePath)) return;
       this.logger?.error?.(`Metadata failed: ${err}`);

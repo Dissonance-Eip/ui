@@ -85,3 +85,21 @@ describe('UploadView error message', () => {
     expect(() => view.clearError()).not.toThrow();
   });
 });
+
+describe('UploadView engine alert', () => {
+  it('shows the engine message in its own alert, apart from the refusal one', () => {
+    const errorEl = { textContent: '', hidden: true };
+    const engineErrorEl = { textContent: '', hidden: true };
+    const view = new UploadView({ errorEl, engineErrorEl });
+
+    view.showEngineError('The audio engine could not be loaded.');
+    view.clearError();
+
+    expect(engineErrorEl.textContent).toBe('The audio engine could not be loaded.');
+    expect(engineErrorEl.hidden).toBe(false);
+  });
+
+  it('does nothing without an engine alert element', () => {
+    expect(() => new UploadView({}).showEngineError('boom')).not.toThrow();
+  });
+});

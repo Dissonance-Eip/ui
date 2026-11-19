@@ -56,7 +56,7 @@ export class ScreenNavigator {
   }
 
   syncButtons() {
-    this.analyzeView.setProcessEnabled(this.state.hasCurrentFile());
+    this.analyzeView.setProcessEnabled(this.state.canProcess());
     this.compareView.setExportEnabled(this.state.hasProcessedFile());
   }
 

@@ -87,6 +87,7 @@ export function bootstrap() {
   const uploadView = new UploadView({
     dropZoneEl: document.getElementById('dropZone'),
     errorEl: document.getElementById('uploadError'),
+    engineErrorEl: document.getElementById('engineError'),
     api,
     logger,
     getLastFilePath: () => state.lastImportedFilePath,

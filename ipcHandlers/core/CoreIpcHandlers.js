@@ -6,6 +6,7 @@
  *   core:writeTags        → write LIST/INFO tags into an existing WAV
  *   core:export           → copy a tracked temp file to a path picked in the save dialog
  *   core:cleanupProcessed → unlink a tracked temp file
+ *   core:engineStatus     → whether the addon loaded, so the UI can say so at startup
  *
  * One method per channel. Constructed once by coreSetup.js with the loaded
  * addon (or null plus the loader's error), a shared TempFileManager, the
@@ -88,6 +89,7 @@ class CoreIpcHandlers {
       [IpcChannels.CORE_READ_METADATA]: this.readMetadata,
       [IpcChannels.CORE_WRITE_TAGS]: this.writeTags,
       [IpcChannels.CORE_EXPORT]: this.export,
+      [IpcChannels.CORE_ENGINE_STATUS]: this.engineStatus,
     };
     Object.entries(handlers).forEach(([channel, handler]) =>
       this.ipc.handle(channel, handler.bind(this))
@@ -104,6 +106,11 @@ class CoreIpcHandlers {
     );
     this.exportNames.delete(processedPath);
     return error ? { ok: false, error: String(error) } : { ok: true };
+  }
+
+  /** `{ ok: true }`, or the ENGINE_UNAVAILABLE reply when the addon can't process. */
+  engineStatus() {
+    return this._requireAddonFn('process', 'Core addon not available') ?? { ok: true };
   }
 
   async process(event, payload) {
