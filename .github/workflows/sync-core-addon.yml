@@ -2,6 +2,11 @@ name: Sync Core Addon into UI
 
 on:
   workflow_dispatch:
+    inputs:
+      core_tag:
+        description: 'core release tag to sync, e.g. v0.0.6-rc.1 (empty = latest release, which skips pre-releases)'
+        required: false
+        default: ''
   repository_dispatch:
     types:
       - core-release
@@ -13,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: sync-core-addon-${{ github.ref }}
@@ -31,35 +37,62 @@ jobs:
       - name: Ensure Build/Release exists
         run: mkdir -p Build/Release
 
-      - name: Download latest Core release assets (.node)
+      - name: Download Core release assets (.node)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN cannot read the private core repo; see README "Syncing binaries from the core repo".
+          GH_TOKEN: ${{ secrets.CORE_RELEASES_TOKEN }}
+          CORE_TAG: ${{ inputs.core_tag }}
         run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret CORE_RELEASES_TOKEN is not set. Create a fine-grained PAT with read-only Contents access to Dissonance-Eip/core and store it as the ui secret CORE_RELEASES_TOKEN."
+            exit 1
+          fi
+
           rm -rf /tmp/core_release
           mkdir -p /tmp/core_release
-          cd /tmp/core_release
 
-          # Downloads assets from the *latest* GitHub Release in Dissonance-Eip/core
-          gh release download --repo Dissonance-Eip/core --pattern "*.node" --dir .
+          # No tag = the latest release, which skips pre-releases such as vX.Y.Z-rc.N.
+          gh release download ${CORE_TAG:+"$CORE_TAG"} --repo Dissonance-Eip/core --pattern "*.node" --dir /tmp/core_release
 
-          ls -lah .
+          ls -lah /tmp/core_release
+          if ! compgen -G "/tmp/core_release/*.node" > /dev/null; then
+            echo "::error::No .node assets found in the core release."
+            exit 1
+          fi
 
       - name: Copy assets into Build/Release
         run: |
-          cp -f /tmp/core_release/*.node Build/Release/ || true
+          cp -f /tmp/core_release/*.node Build/Release/
           ls -lah Build/Release
 
-      - name: Commit and push changes (if any)
+      - name: Open or update the sync pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: chore/sync-core-addon
+          CORE_TAG: ${{ inputs.core_tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add Build/Release/*.node || true
+          git add Build/Release/*.node
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
-          git commit -m "chore(ui): sync core addon binaries [skip ci]"
-          git push
+          # main is protected by a ruleset (1 approving review), so changes go through a pull request.
+          git checkout -B "$BRANCH"
+          git commit -m "chore(ui): sync core addon binaries"
+          git push --force origin "HEAD:$BRANCH"
+
+          body="Automated sync of the core addon binaries (Build/Release/*.node) from core release ${CORE_TAG:-latest}.
+
+          This pull request was opened with GITHUB_TOKEN, so it does not trigger the required \"Lint, Format, Test, Build\" check. Close and reopen it to run the checks before merging."
+
+          pr=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number')
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --body "$body"
+          else
+            gh pr create --base main --head "$BRANCH" --title "chore(ui): sync core addon binaries" --body "$body"
+          fi
