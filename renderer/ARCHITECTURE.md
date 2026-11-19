@@ -48,6 +48,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
 - `renderer/utils/`
   - `pathUtils.js` — `basename()` for absolute paths (POSIX + Windows).
   - `wavInfoFormatters.js` — display formatters for duration, sample rate, channels.
+  - `errorMessage.js` — `userErrorReason()`: the reason behind a failed reply or thrown error, without `Error:` / IPC prefixes or stack lines, fit to show the user.
 
 ## Conventions
 
