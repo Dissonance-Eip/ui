@@ -27,7 +27,7 @@ A view IS a component — same lifecycle, same listener tracking, same dispose. 
   - `ViewRouter.js` — show-one-hide-others switcher for the three top-level views.
 - `renderer/controllers/`
   - `AppController.js` — thin coordinator: builds the flows below and wires view, window and main-process events (quit flush, multi-window pause/refresh, core status) to them.
-  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard. Refuses a non-WAV before anything changes, with a message on Upload, or on Analyze when a file is shown (ui#82).
+  - `FileImportFlow.js` — upload / change file / drop anywhere → Analyze, metadata read with the stale-reply guard. Refuses a non-WAV (ui#82) or a damaged WAV (`file:checkWav`, ui#147) before anything changes, with a message on Upload, or on Analyze when a file is shown.
   - `ProcessingFlow.js` — process → Compare, export, restart; the operation id that discards a result arriving after a restart.
   - `TagEditSession.js` — the TagWriteQueue, playback↔queue coordination, what a form snapshot may write (#111), and the pause-and-flush chokepoint.
   - `ScreenNavigator.js` — which screen shows, the header, the Process / Export buttons.

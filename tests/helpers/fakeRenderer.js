@@ -137,6 +137,7 @@ export function makeBridge({
     openFile: vi.fn(async () => null),
     getPathForFile: vi.fn(() => null),
     readFileMetadata: vi.fn(async () => metadataReply()),
+    checkWavFile: vi.fn(async () => ({ ok: true })),
     processFile: vi.fn(async () => ({ ok: true, processedPath })),
     writeTags: vi.fn(async () => ({ ok: true })),
     exportFile: vi.fn(async () => ({ ok: true, exportedPath: '/out/song.wav' })),

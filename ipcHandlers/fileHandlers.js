@@ -6,6 +6,7 @@
  * `event.sender`:
  *   UiLogForwarder      — `ui:log` channel for renderer console forwarding
  *   FileDialogHandlers  — `dialog:openFile`
+ *   wavFileCheck        — `file:checkWav` (refuse a damaged WAV at import)
  *   themeHandlers       — `ui:getSystemTheme` + `ui:systemTheme` push to every window
  *   coreSetup           — `core:*` handlers (process, readMetadata, writeTags, export, cleanup)
  *
@@ -16,6 +17,7 @@
  */
 const { UiLogForwarder } = require('./UiLogForwarder');
 const { FileDialogHandlers } = require('./FileDialogHandlers');
+const { registerWavCheckHandler } = require('./wavFileCheck');
 const { registerThemeHandlers } = require('./themeHandlers');
 const coreSetup = require('./core/coreSetup');
 
@@ -34,6 +36,7 @@ function registerFileHandlers({
 } = {}) {
   new UiLogForwarder({ ipc }).register();
   new FileDialogHandlers({ ipc, dialog }).register();
+  registerWavCheckHandler({ ipc });
   registerTheme();
   registerCore();
 }
