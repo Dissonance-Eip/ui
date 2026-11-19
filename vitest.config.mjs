@@ -10,6 +10,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.js'],
+    globalSetup: ['tests/setup/electronBinary.js'],
     server: {
       deps: {
         // The main-process code is CommonJS. A test that imports a module
