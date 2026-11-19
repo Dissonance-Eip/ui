@@ -68,7 +68,7 @@ export class AppController extends BaseController {
     this._wireAppEvents();
     this.screens.syncButtons();
     this.logger?.setStatus?.('Ready');
-    this._checkEngine();
+    this._checkEngine().catch((err) => this.logger?.error?.(`Engine status check failed: ${err}`));
   }
 
   _mountViews() {
@@ -128,11 +128,7 @@ export class AppController extends BaseController {
 
   /** Ask main once whether the native engine loaded; say so if it did not. */
   async _checkEngine() {
-    try {
-      if (isEngineUnavailable(await this.api.getEngineStatus())) this.reportEngineUnavailable();
-    } catch (err) {
-      this.logger?.error?.(`Engine status check failed: ${err}`);
-    }
+    if (isEngineUnavailable(await this.api.getEngineStatus())) this.reportEngineUnavailable();
   }
 
   /** Persistent alert on Upload, and Process stays disabled for the session. */
