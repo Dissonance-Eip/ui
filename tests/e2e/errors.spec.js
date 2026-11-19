@@ -3,9 +3,7 @@
  * crashes, never reaches Compare with a broken file, and stays usable — a
  * good file imports and processes afterwards.
  *
- * On main the failures are silent (the reason only reaches the terminal).
- * The tests marked test.fail assert the visible messages of the open fixes;
- * remove test.fail once the named PR is merged.
+ * Each failure also shows a readable message (ui#81, ui#82).
  */
 import fs from 'node:fs';
 import {
@@ -76,30 +74,31 @@ for (const [name, bytes] of Object.entries(BAD_FILES)) {
     await expectStillUsable(app, page, workDir);
   });
 
-  // ui#81, fixed by PR #139 (81-processing-error-message).
-  test.fail(
-    `${name}: Process shows a readable error on Analyze (#81)`,
-    async ({ app, page, workDir }) => {
-      await importAndProcess(app, page, workDir, name, bytes);
+  test(`${name}: Process shows a readable error on Analyze (#81)`, async ({
+    app,
+    page,
+    workDir,
+  }) => {
+    await importAndProcess(app, page, workDir, name, bytes);
 
-      const alert = page.locator('#view-analyze [role="alert"]');
-      await expect(alert).toBeVisible({ timeout: 10_000 });
-      await expect(alert).toContainText(/could not/i);
-    }
-  );
+    const alert = page.locator('#view-analyze [role="alert"]');
+    await expect(alert).toBeVisible({ timeout: 10_000 });
+    await expect(alert).toContainText(/could not/i);
+  });
 }
 
 for (const name of ['zero-length.wav', 'not-riff.wav']) {
-  // ui#81, fixed by PR #139: a file whose header can't be read says so on import.
-  test.fail(
-    `${name}: import shows a readable error on Analyze (#81)`,
-    async ({ app, page, workDir }) => {
-      await importViaPicker(app, page, writeFixture(workDir, name, BAD_FILES[name]));
+  // A file whose header can't be read says so on import.
+  test(`${name}: import shows a readable error on Analyze (#81)`, async ({
+    app,
+    page,
+    workDir,
+  }) => {
+    await importViaPicker(app, page, writeFixture(workDir, name, BAD_FILES[name]));
 
-      await expect(page.locator('#analyzeMetaSampleRate')).toHaveText('—');
-      await expect(page.locator('#view-analyze [role="alert"]')).toBeVisible({ timeout: 10_000 });
-    }
-  );
+    await expect(page.locator('#analyzeMetaSampleRate')).toHaveText('—');
+    await expect(page.locator('#view-analyze [role="alert"]')).toBeVisible({ timeout: 10_000 });
+  });
 }
 
 for (const [name, bytes] of Object.entries(NON_WAV_FILES)) {
@@ -113,24 +112,15 @@ for (const [name, bytes] of Object.entries(NON_WAV_FILES)) {
     await page.locator('#dropZone').click();
     await expect.poll(() => openDialogCalls(app)).toBe(1);
 
-    // Today the file is shown on Analyze with no info; with #82 it is refused on Upload.
-    await expect(
-      page.locator('#view-analyze:visible, #view-upload [role="alert"]:visible')
-    ).toBeVisible();
-    await expect(page.locator('#analyzeMetaSampleRate')).toHaveText('—');
-    if (await page.locator(screens.analyze).isVisible()) {
-      await tickModes(page, ['White Noise']);
-      await page.locator('#processBtn').click();
-      await expect(page.locator(screens.analyze)).toBeVisible();
-      await expect(page.locator('#processBtn')).toBeEnabled();
-    }
+    // The picker only offers WAV; the stub stands in for a user forcing another file.
+    await expect(page.locator('#view-upload [role="alert"]')).toBeVisible();
+    await expect(page.locator(screens.analyze)).toBeHidden();
     await expect(page.locator(screens.compare)).toBeHidden();
 
     await expectStillUsable(app, page, workDir);
   });
 
-  // ui#82, fixed by PR #140 (82-wav-only-import): refused at import, with a message.
-  test.fail(`${name}: refused at import with a message (#82)`, async ({ app, page, workDir }) => {
+  test(`${name}: refused at import with a message (#82)`, async ({ app, page, workDir }) => {
     const file = writeFixture(workDir, name, bytes);
     await stubOpenDialog(app, file);
     await page.locator('#dropZone').click();

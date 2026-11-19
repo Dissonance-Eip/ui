@@ -140,29 +140,28 @@ test('Restart from Analyze and from Compare returns to a cleared Upload (F29, F4
   await expect(page.locator('#analyzeMetaChannels')).toHaveText('1');
 });
 
-// ui#83, fixed by PR #142 (83-zero-strength-passthrough): with no mode ticked,
-// Process copies the audio unchanged. On main the Process button stays
-// disabled until a mode is ticked. Remove test.fail once #142 is merged.
-test.fail(
-  'no mode ticked: Process gives a byte-identical audio pass-through (#83)',
-  async ({ app, page, workDir }) => {
-    const file = writeFixture(workDir, 'passthrough.wav', { seconds: 2 });
-    const original = readWav(file);
-    await importViaPicker(app, page, file);
-    await waitForMetadata(page);
+// With no mode ticked, Process copies the audio unchanged.
+test('no mode ticked: Process gives a byte-identical audio pass-through (#83)', async ({
+  app,
+  page,
+  workDir,
+}) => {
+  const file = writeFixture(workDir, 'passthrough.wav', { seconds: 2 });
+  const original = readWav(file);
+  await importViaPicker(app, page, file);
+  await waitForMetadata(page);
 
-    await expect(page.locator('#processBtn')).toBeEnabled({ timeout: 5_000 });
-    await page.locator('#processBtn').click();
-    await expect(page.locator(screens.compare)).toBeVisible({ timeout: 60_000 });
-    const exported = path.join(workDir, 'passthrough-out.wav');
-    await stubSaveDialog(app, exported);
-    await page.locator('#compareExportBtn').click();
-    await expect(page.locator(screens.upload)).toBeVisible();
+  await expect(page.locator('#processBtn')).toBeEnabled({ timeout: 5_000 });
+  await page.locator('#processBtn').click();
+  await expect(page.locator(screens.compare)).toBeVisible({ timeout: 60_000 });
+  const exported = path.join(workDir, 'passthrough-out.wav');
+  await stubSaveDialog(app, exported);
+  await page.locator('#compareExportBtn').click();
+  await expect(page.locator(screens.upload)).toBeVisible();
 
-    const output = readWav(exported);
-    expect(output.sampleRate).toBe(original.sampleRate);
-    expect(output.channels).toBe(original.channels);
-    expect(output.bitsPerSample).toBe(original.bitsPerSample);
-    expect(output.data.equals(original.data)).toBe(true);
-  }
-);
+  const output = readWav(exported);
+  expect(output.sampleRate).toBe(original.sampleRate);
+  expect(output.channels).toBe(original.channels);
+  expect(output.bitsPerSample).toBe(original.bitsPerSample);
+  expect(output.data.equals(original.data)).toBe(true);
+});
