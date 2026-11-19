@@ -10,7 +10,8 @@ The short version for this repository:
   only long-lived branch; see the
   [development workflow](https://github.com/Dissonance-Eip/docs/blob/main/planning/development-workflow.md).
 - Before pushing, run `npm run lint`, `npm run format:check`, `npm test` and
-  `npm run build`.
+  `npm run build`. A change to a user flow also runs `npm run test:e2e` (see the
+  README's end-to-end tests section).
 
 ## Pre-commit hook
 
