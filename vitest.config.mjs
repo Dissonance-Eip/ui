@@ -30,7 +30,7 @@ export default defineConfig({
       include: ['main.js', 'preload.js', 'main/**/*.js', 'ipcHandlers/**/*.js', 'renderer/**/*.js'],
       exclude: ['tests/**', 'node_modules/**', 'coverage/**', 'dist/**', 'Build/**'],
       // `npm run test:coverage` (and so CI) fails below the team target (#129).
-      thresholds: { lines: 85 },
+      thresholds: { lines: 90 },
     },
   },
 });
