@@ -94,7 +94,7 @@ For an interactive test loop: `npm run test:watch`.
 npm run test:coverage
 ```
 
-Prints a per-file coverage table and writes a report to `coverage/` (git-ignored; open `coverage/index.html` for the browsable version). Every source file is counted, including files that no test imports, so the total reflects the real state of the project. The team target is 85% line coverage, enforced by `vitest.config.mjs`: the command fails below it, and so does CI, which also prints the total in the job summary.
+Prints a per-file coverage table and writes a report to `coverage/` (git-ignored; open `coverage/index.html` for the browsable version). Every source file is counted, including files that no test imports, so the total reflects the real state of the project. The team target is 90% line coverage, enforced by `vitest.config.mjs`: the command fails below it, and so does CI, which also prints the total in the job summary.
 
 ### Addon integration test
 
