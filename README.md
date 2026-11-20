@@ -193,7 +193,9 @@ A relative path is resolved against the directory you launch from.
 
 ### Syncing binaries from the core repo
 
-The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts from a core GitHub Release into `Build/Release/`. It writes the tag of that release to `Build/Release/CORE_VERSION`, so the committed binaries always say which core release they come from. It fires automatically on push to `main`. After a core release is tagged, run "Sync Core Addon into UI" by hand from the Actions tab; core does not trigger it. Its `core_tag` input picks a release (for example a `vX.Y.Z-rc.N` pre-release). Left empty, it takes the latest release, which skips pre-releases.
+The `.github/workflows/sync-core-addon.yml` workflow pulls `.node` artifacts from a core GitHub Release into `Build/Release/`. It writes the tag of that release to `Build/Release/CORE_VERSION`, so the committed binaries always say which core release they come from. It runs by hand only: after a core release is tagged, run "Sync Core Addon into UI" from the Actions tab. Neither a push to `main` nor core triggers it. Its `core_tag` input picks a release (for example a `vX.Y.Z-rc.N` pre-release). Left empty, it takes the latest release, which skips pre-releases.
+
+The workflow refuses to downgrade: if the release is older than the `CORE_VERSION` on `main` (a `vX.Y.Z-rc.N` counts as older than `vX.Y.Z`), it fails with an error and opens no pull request. To roll back on purpose, run it again with `allow_downgrade` ticked.
 
 `main` is protected, so the workflow does not push to it. It commits the new binaries to the `chore/sync-core-addon` branch and opens a pull request into `main`, or updates the one already open. If nothing changed, or the open pull request already has the same binaries, it does nothing. A pull request opened by the workflow's `GITHUB_TOKEN` does not start other workflows, so the required `Lint, Format, Test, Build` check does not run on it. Close and reopen the pull request to run the checks, then review and merge it as usual.
 
