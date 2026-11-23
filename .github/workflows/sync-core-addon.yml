@@ -7,11 +7,10 @@ on:
         description: 'core release tag to sync, e.g. v0.0.6-rc.1 (empty = latest release, which skips pre-releases)'
         required: false
         default: ''
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'Build/Release/**'
+      allow_downgrade:
+        description: 'sync even if core_tag is older than Build/Release/CORE_VERSION on main'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,7 +23,6 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]'
     steps:
       - name: Checkout UI repo
         uses: actions/checkout@v4
@@ -69,7 +67,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: chore/sync-core-addon
+          ALLOW_DOWNGRADE: ${{ inputs.allow_downgrade }}
         run: |
+          current=$(git show origin/main:Build/Release/CORE_VERSION 2>/dev/null || true)
+          new=$(cat Build/Release/CORE_VERSION)
+          # '~' makes sort -V rank vX.Y.Z-rc.N below vX.Y.Z.
+          if [ -n "$current" ] && [ "$new" != "$current" ] && [ "$ALLOW_DOWNGRADE" != true ] &&
+             [ "$(printf '%s\n' "$current" "$new" | tr - '~' | sort -V | head -1)" = "$(echo "$new" | tr - '~')" ]; then
+            echo "::error::core $new is older than $current on main. Re-run with allow_downgrade to sync it anyway."
+            exit 1
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
