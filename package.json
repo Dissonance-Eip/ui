@@ -1,7 +1,7 @@
 {
   "name": "Dissonance",
   "productName": "Dissonance",
-  "version": "0.1.1",
+  "version": "0.2.0-rc.1",
   "private": true,
   "description": "Silencing AI, Preserving Sound",
   "main": "main.js",
