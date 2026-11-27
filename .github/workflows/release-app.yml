@@ -149,6 +149,17 @@ jobs:
         with:
           path: artifacts
 
+      # Bare file names, so `sha256sum -c` works next to the downloaded assets.
+      # SHA256SUMS.txt sits in artifacts/ itself, so */* never hashes it.
+      - name: Write SHA256 checksums
+        working-directory: artifacts
+        run: |
+          shopt -s nullglob
+          files=(*/*)
+          [ ${#files[@]} -gt 0 ] || { echo "::error::No release files to checksum."; exit 1; }
+          for f in "${files[@]}"; do (cd "$(dirname "$f")" && sha256sum "$(basename "$f")"); done > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -173,3 +184,6 @@ jobs:
             - The Windows and Linux builds are unsigned: Windows SmartScreen
               warns on first launch (More info → Run anyway).
             - macOS is Apple Silicon only; no Intel build.
+            - To verify a download, put `SHA256SUMS.txt` next to it and run
+              `sha256sum -c --ignore-missing SHA256SUMS.txt`
+              (macOS: `shasum -a 256 -c --ignore-missing SHA256SUMS.txt`).
